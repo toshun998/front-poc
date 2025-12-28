@@ -1,386 +1,48 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { getTargets } from "../FrontServer/personaApi";
-import { explainLineEval as explainLineEvalApi } from "../FrontServer/personaApi";
-import "./App.css";   // ← これを追加
-import {checkLogBias, getNoise, arrangeBoard ,evidenceQuest,getTeamState,updateTeamState,subscribePlan } from "../FrontServer/personaApi";
+﻿//React
+import { useEffect, useMemo, useRef, useState } from "react";
+//personaApi
+import {getTargets,explainLineEval as explainLineEvalApi,checkLogBias,getNoise,arrangeBoard,evidenceQuest,getTeamState,updateTeamState,subscribePlan,
+} from "../FrontServer/personaApi";
+//Styles
+import "./App.css";
+//Img
 import kobusiImg from "../Images/kobusi.png";
+//App_Options
 import LoginModal from "../App_Options/LoginModal";
+//PDF
 import { jsPDF } from "jspdf";
-import "../Assets/NotoSansJP-Regular-normal"; // フォント登録（副作用）
+import "../Assets/NotoSansJP-Regular-normal";
 
-export function exportLogPdf(payload = {}) {
-  const pdf = new jsPDF({
-    unit: "mm",
-    format: "a4",
-  });
-
-  // ★ ここが重要
-  pdf.setFont("NotoSansJP-Regular", "normal");
-  pdf.setFontSize(12);
-
-  let y = 15;
-
-  // ★ 日本語は配列で渡す（utf8対策）
-  pdf.text(["思考アスレチック ログ"], 10, y);
-  y += 10;
-
-  Object.entries(payload).forEach(([k, v]) => {
-    const line = `${k}: ${String(v ?? "")}`;
-    pdf.text([line], 10, y); // ← 配列！！
-    y += 8;
-  });
-
-  pdf.save("log.pdf");
-}
-
-
-
-
-//import FloatingAI from "./FloatingAI";
-
-
-
-/* ========== Outlier badges ========== */
-const OUTLIER = {
-  "断定": {
-    icon: "❗",
-    code: "断定",
-    label: "断定",
-    color: "#ef4444",
-    desc: "断定してるかも。条件を付けよう。",
-  },
-  "因果が粗い": {
-    icon: "🔄",
-    code: "因果",
-    label: "因果",
-    color: "#4aa5faff",
-    desc: "因果関係が曖昧かも。根拠をはっきりさせよう。",
-  },
-  "権威に依存": {
-    icon: "👑",
-    code: "権威",
-    label: "権威",
-    color: "#8b5cf6",
-    desc: "肩書や伝聞は本当に真実なのかな。",
-  },
-  "仮説過多(H≫E)": {
-    icon: "💭",
-    code: "仮説",
-    label: "仮説",
-    color: "#0ea5e9",
-    desc: "仮説が多いかも。事実が欲しいね。",
-  },
-  "倫理リスク": {
-    icon: "🚫",
-    code: "倫理",
-    label: "倫理",
-    color: "#f97316",
-    desc: "人権・倫理に反するかも。安全な代替を。",
-  },
-  "主観": {
-    icon: "👀",
-    code: "主観",
-    label: "主観",
-    color: "#10b981",
-    desc: "主観が強いかも。客観も足そう。",
-  },
-  "矛盾": {
-    icon: "🗡️🛡️",
-    code: "矛盾",
-    label: "矛盾",
-    color: "#e11d48",
-    desc: "条件を分けて整理しよう。",
-  },
-  "均衡": {
-    icon: "⚖️",
-    code: "均衡",
-    label: "均衡",
-    color: "#84331F",
-    desc: "バランス良し。良いね！",
-  },
-  "不明": {
-    icon: "❓",
-    code: "不明",
-    label: "不明",
-    color: "#9ca3af",
-    desc: "意味が取りづらいかも。判断要素を増やそう。",
-  },
-};
-
-
-
-
-
-export function BrainShower() {
-  const containerRef = useRef(null);
-  const icons = ["🧠", "💡", "💭", "📘", "🎨", "🔎", "❓", "❗️", "👊"];
-  const intervalRef = useRef(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // 🧠 定期的に新しいアイコンを生成して落とす
-    const createBrain = () => {
-      const span = document.createElement("span");
-      const icon = icons[Math.floor(Math.random() * icons.length)];
-      const hue = Math.floor(Math.random() * 360);
-
-      span.textContent = icon;
-      span.style.position = "absolute";
-      span.style.left = `${Math.random() * 100}%`;
-      span.style.top = "-10%";
-      span.style.fontSize = `${18 + Math.random() * 24}px`;
-      span.style.opacity = 0.6 + Math.random() * 0.4;
-      span.style.filter = `drop-shadow(0 0 3px hsl(${hue}, 80%, 70%))`;
-      span.style.animation = `fallBrain ${8 + Math.random() * 8}s linear`;
-      span.style.transform = `rotate(${Math.random() * 360}deg)`;
-      span.style.pointerEvents = "none";
-
-      // 💫 アニメーション終了後に削除
-      span.addEventListener("animationend", () => span.remove());
-
-      container.appendChild(span);
-    };
-
-    // 🌧 継続して降らせる（0.3秒ごと）
-    intervalRef.current = setInterval(createBrain, 300);
-
-    return () => {
-      clearInterval(intervalRef.current);
-    };
-  }, []);
-
-  return <div ref={containerRef} className="brain-shower" />;
-}
-
-
-
-function OutlierBadges({ flags=[] }){
-  if(!Array.isArray(flags)||flags.length===0) return null;
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
-      {flags.map((f,i)=>{ 
-        const m = OUTLIER[f] || {icon:"🙂",code:"",color:"#94a3b8",desc:String(f)};
-        return (
-          <div key={`${f}-${i}`} style={{display:"flex",alignItems:"center",gap:8}}>
-            {/* 丸いアイコン */}
-            <span style={{
-              display:"inline-flex",
-              alignItems:"center",
-              justifyContent:"center",
-              width:22,height:22,
-              borderRadius:"50%",
-              background:m.color,
-              color:"#fff",
-              fontSize:13,
-              flexShrink:0
-            }}>{m.icon}</span>
-            {/* コードと説明を横並び */}
-            <span style={{fontWeight:"bold",marginRight:4}}>{m.code}</span>
-            <span style={{fontSize:13,color:"#374151"}}>{m.desc}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-
-
-/* ========== Helpers ========== */
-// ① API 戻り形のゆれ（配列/オブジェクト）を吸収
-function unbox(r){
-  if (r==null) return r;
-  if (Array.isArray(r)) return r[0] ?? null;
-  if (r && Array.isArray(r.data)) return r.data[0] ?? null;
-  return r;
-}
-const toTaigen = s => String(s||"").trim().replace(/[?？。]+$/,"").replace(/(とは|はなぜ.*|について.*)$/,"") || "この議題";
-const hasCausalCue = s => /だから|ため|ので|ゆえ|せい|結果|影響|原因|引き起こ/.test(String(s||""));
-const clamp = (x,min=0,max=1)=> Math.max(min,Math.min(max,x));
-const toPhrases = txt => String(txt||"").split(/\r?\n|。|、|;|；|・|,/).map(s=>s.trim()).filter(Boolean).map(s=>s.length>18? s.slice(0,18)+"..." : s).slice(0,6);
-const jaccard = (a,b)=>{ const A=new Set(String(a||"").toLowerCase().split(/\s+/).filter(Boolean)); const B=new Set(String(b||"").toLowerCase().split(/\s+/).filter(Boolean)); const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size||1; return inter/uni; };
-
-// Stakeholders（Front フォールバック＋正規化）
-function defaultStakeholdersFor(topic) {
-  const t = String(topic || "").toLowerCase();
-  const unique = new Set();
-
-  // --- カテゴリ辞書 ---
-  const categories = [
-    { key: /性犯罪|暴力|虐待|誹謗|犯罪|治安/, list: ["被害当事者","加害当事者","警察","支援団体","地域住民","自治体関係者","報道関係者","法律専門家"] },
-    { key: /教育|学生|授業|大学|学校|研究|教師|学習|課題/, list: ["学生","教員","保護者","教育委員会","学校運営者","研究者","同級生","教育政策担当"] },
-    { key: /医療|病院|健康|看護|福祉|介護|ワクチン|感染/, list: ["患者","医療従事者","家族","保健所","製薬会社","自治体関係者","倫理委員会","報道関係者"] },
-    { key: /経済|企業|雇用|ビジネス|投資|景気|物価|副業/, list: ["社員","経営者","顧客","投資家","取引先","政府関係者","労働組合","地域住民"] },
-    { key: /政治|政府|政策|法律|選挙|行政|国会|制度|外交/, list: ["国民","政治家","行政職員","専門家","市民団体","報道関係者","法曹関係者","NPO関係者"] },
-    { key: /環境|自然|気候|エネルギー|原発|災害|防災|再生可能/, list: ["地域住民","専門家","政府関係者","企業","研究者","環境団体","ボランティア","教育者"] },
-    { key: /ai|人工知能|テクノロジー|機械|プログラム|開発|データ|セキュリティ/, list: ["開発者","利用者","研究者","倫理専門家","法曹関係者","企業","行政関係者","教育者"] },
-    { key: /sns|ネット|動画|投稿|炎上|フォロワー|コミュニティ|インターネット/, list: ["ユーザー","プラットフォーム運営","視聴者","広告主","報道関係者","インフルエンサー","モデレーター","被害者"] },
-    { key: /文化|芸術|音楽|映画|ゲーム|アニメ|創作|発表|表現/, list: ["制作者","観客","ファン","出版社","報道関係者","批評家","スポンサー","教育機関"] },
-    { key: /宗教|哲学|倫理|信仰|死生観|価値観|思想|信念/, list: ["信者","指導者","哲学者","研究者","宗教団体","教育者","一般市民","報道関係者"] },
-    { key: /恋愛|結婚|家族|友人|人間関係|子育て|離婚|孤独/, list: ["本人","恋人","配偶者","家族","友人","カウンセラー","SNSフォロワー","教育者"] },
-    { key: /科学|宇宙|未来|技術革新|バイオ|遺伝子|ロボット|量子/, list: ["科学者","技術者","企業","政府関係者","倫理委員会","研究機関","一般市民","学生"] },
-    { key: /国際|戦争|平和|外交|難民|条約|貿易|多文化|移民/, list: ["政府関係者","国際機関","外国人住民","市民団体","報道関係者","研究者","支援者","一般市民"] },
-    { key: /都市|交通|住宅|再開発|地域|観光|景観|まちづくり/, list: ["住民","観光客","事業者","建設業者","設計者","自治体関係者","地域団体","環境専門家"] },
-    { key: /生活|消費|食|家計|物価|サブスク|通販|電気|水道/, list: ["消費者","販売者","製造者","流通業者","金融機関","政府関係者","NPO","地域住民"] },
-    { key: /心理|メンタル|ストレス|幸福|自己肯定感|カウンセリング/, list: ["本人","家族","カウンセラー","心理学者","友人","教育者","医師","支援者"] },
-    { key: /働き方|チーム|リーダー|上司|部下|会議|評価|モチベーション/, list: ["上司","部下","人事担当","経営者","チームメンバー","コーチ","組織心理士","教育担当"] },
-    { key: /倫理|モラル|自由|規制|言論|著作権|人権|差別/, list: ["表現者","読者","規制当局","法曹関係者","報道関係者","哲学者","市民","教育者"] },
-    { key: /夢|希望|恐怖|怒り|悲しみ|未来|現実|自由|幸せ|孤独|人生|愛|死|存在|意味|心/, list: ["本人","家族","友人","心理学者","哲学者","作家","教育者","一般市民"] },
-  ];
-
-  // --- マルチマッチング ---
-  for (const c of categories) {
-    if (c.key.test(t)) {
-      c.list.forEach(x => unique.add(x));
-    }
-  }
-
-  // --- 何も該当しなかった場合のフォールバック ---
-  if (unique.size === 0) {
-    ["当事者","関係者","専門家","行政関係者","研究者","支援者","一般市民"]
-      .forEach(x => unique.add(x));
-  }
-
-  return Array.from(unique);
-}
-
-
-const sendLogin = async () => {
-  try {
-    const res = await fetch("https://ms-engine-test.sinnosukeyamane.workers.dev/persona/loginRequest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ redirect: window.location.href }),
-    });
-
-    const data = await res.json();
-
-    if (data.url) {
-      // Googleログイン画面（OAuth）へ飛ぶ
-      window.location.href = data.url;
-    } else {
-      alert("ログイン開始に失敗しました");
-    }
-  } catch (err) {
-    console.error(err);
-    alert("通信エラー");
-  }
-};
-
-
-
-
-const keyPlain = s => String(s||"").replace(/\s+/g,"").replace(/[『』「」【】（）()［］\[\]、。・,.!?！？]/g,"").toLowerCase();
-function isTooClose(name, topic){
-  const a=keyPlain(name), b=keyPlain(toTaigen(topic));
-  if(!a||!b||a.length<=2) return false;
-  if (b.includes(a) || a.includes(b)) return true;
-  const A=new Set(a.split("")); const B=new Set(b.split(""));
-  const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size||1;
-  return inter/uni > 0.6;
-}
-function normalizeStakeholders(topic, names){
-  const base = defaultStakeholdersFor(topic);
-  const out=[]; for(const n of [...names,...base]){ const s=String(n||"").trim(); if(!s) continue; if(isTooClose(s, topic)) continue; if(!out.includes(s)) out.push(s); }
-  return out.slice(0,12);
-}
-
-/* ========== OOTB (簡易) ========== */
-const OOTB_MODE = ["easy","standard","hard"];
-const isNovelAgainst = (prev, now, thr=0.45)=> jaccard(prev||"", now||"") < thr;
-function detectPositiveOutlier(note, topic, previousNotes){
-  const txt = [note.otherPrem, note.idea, note.cause].filter(Boolean).join(" ");
-  const T   = (topic||"") + " " + txt;
-  const frameShift = /(過程|プロセス|履歴|透明性|再現|公平|代替手段|抽選|スポットチェック|口頭|録音|ランダム|申告)/.test(T);
-  const conditional = /(ただし|条件|場合|上限|下限|境界|分けて|とき|なら|条件付き)/.test(T);
-  const microTrial  = /(小さく|試(す|行)|即興|ミニ|タイムラプス|一部で|抽出|対照|パイロット|検証)/.test(T) || (note.who && note.what && note.how);
-  const hitKinds = []; if(frameShift) hitKinds.push("frame"); if(conditional) hitKinds.push("cond"); if(microTrial) hitKinds.push("trial");
-  const prev = (previousNotes||[]).slice(0,6).map(n=> n.a || n.idea || n.cause || "");
-  const novel = prev.every(p => isNovelAgainst(p, txt, 0.45));
-  return { isHit: novel && (hitKinds.length >= 2), hitKinds };
-}
-function judgeOOTB(teamNotes, mode="standard"){
-  const userNotes = teamNotes.filter(n=>n.author!=="noise");
-  let sim=0,cmp=0;
-  for(let i=1;i<userNotes.length;i++){ cmp++; if(jaccard(userNotes[i-1].a, userNotes[i].a)>0.75) sim++; }
-  const diversity = cmp ? (1 - sim/cmp) : 0;
-  let hitCount=0; const byAuthor=new Set();
-  for(let i=0;i<userNotes.length;i++){
-    const n=userNotes[i]; const prev=userNotes.slice(Math.max(0,i-6), i);
-    const { isHit } = detectPositiveOutlier(n, n.q||"", prev);
-    if(isHit){ hitCount++; byAuthor.add(n.author||""); }
-  }
-  const hasOtherPrem = userNotes.some(n=> (n.otherPrem||"").trim());
-  if(mode==="easy")    return (hitCount>=1) && (diversity>=0.20);
-  if(mode==="hard")    return (byAuthor.size>=2) && (hitCount>=2) && (diversity>=0.50) && hasOtherPrem;
-  return (hitCount>=1) && (diversity>=0.40);
-}
 
 /* ========== App ========== */
 export default function App(){
-  /* Session */
-const DISABLE_BUTTONS = true; // ← 試作封印モード（解除する時は false）
-// ★ ここを true / false 切り替えるだけで全部ON/OFF
 const SHOW_DEBUG_BUTTONS = true;
-
-
-const disabledStyle = DISABLE_BUTTONS
-  ? {
-      position: "relative",
-      opacity: 0.6,
-      cursor: "not-allowed",
-      pointerEvents: "none",
-    }
-  : {};
-
-const disabledOverlay = DISABLE_BUTTONS ? (
-  <div
-    style={{
-      position: "absolute",
-      inset: 0,
-      overflow: "hidden",
-      pointerEvents: "none",
-      zIndex: 20,
-    }}
-  >
-    <div
-      style={{
-        position: "absolute",
-        width: "200%",
-        height: 3,
-        background: "red",
-        top: "50%",
-        left: "-50%",
-        transform: "rotate(-45deg)",
-        opacity: 0.85,
-      }}
-    />
-  </div>
-) : null;
-
-
+//Intro定義
+const [view, setView] = useState("INTRO");
+const [stage, setStage] = useState("intro");
+  //Kv保存定義
+const [topic,setTopic] = useState("");
+const [role,setRole] = useState(()=>localStorage.getItem("role")||"user");
+const [teamName,setTeamName] = useState(()=>localStorage.getItem("teamName")||"T1");
+const [displayName] = useState(()=>localStorage.getItem("displayName")||"");
+//LoadingUI定義
 const [gateLoading, setGateLoading] = useState(false);
 const [showUserMenu, setShowUserMenu] = useState(false);
 const [plan, setPlan] = useState("free");
+//Login定義
 const [showLogin, setShowLogin] = useState(false);
-  const [user, setUser] = useState(null); // ← ログイン中ユーザー
-  const [topic,setTopic] = useState("");
-  const [role,setRole] = useState(()=>localStorage.getItem("role")||"user");
-  const [teamName,setTeamName] = useState(()=>localStorage.getItem("teamName")||"T1");
-  const [displayName] = useState(()=>localStorage.getItem("displayName")||"");
-  const [gateOpen,setGateOpen] = useState(false);
-  const [aiMode, setAiMode] = useState(false);
-  const [targetList, setTargetList] = useState(defaultStakeholdersFor(topic));
-  const [view, setView] = useState("INTRO");
-  const [stage, setStage] = useState("intro");
-  const [headerOpen, setHeaderOpen] = useState(true);
-  const [page, setPage] = useState(1);
-  const [loadingEval, setLoadingEval] = useState(false);
-  const [loadingTargets, setLoadingTargets] = useState(false);
-  const [compactView, setCompactView] = useState(false);
-  const { listening, startListening } = useSpeechInput((text) => {
+const [user, setUser] = useState(null); // ← ログイン中ユーザー
+//ボタン機能定義
+const [gateOpen,setGateOpen] = useState(false);
+const [page, setPage] = useState(1);
+const [aiMode, setAiMode] = useState(false);
+const [targetList, setTargetList] = useState(defaultStakeholdersFor(topic));
+const [headerOpen, setHeaderOpen] = useState(true);
+const [loadingEval, setLoadingEval] = useState(false);
+const [loadingTargets, setLoadingTargets] = useState(false);
+const [compactView, setCompactView] = useState(false);
+//音声入力定義
+const { listening, startListening } = useSpeechInput((text) => {
     setTopic((prev) => (prev ? prev + " " + text : text));
   });
   const { listening: scenarioListening, startListening: startScenarioListening } =
@@ -456,7 +118,6 @@ const { listening: listeningPlan, startListening: startPlanListening } =
       return updated;
     });
   });
-
 const { listening: badListening, startListening: startBadListening } =
   useSpeechInput((text) => {
     setPlans((prev) => {
@@ -465,20 +126,24 @@ const { listening: badListening, startListening: startBadListening } =
       return updated;
     });
   });
-
-
   const [plans, setPlans] = useState([
     { who: "", what: "", how: "", good: "", bad: "" },
   ]);
-  
+//設定内容のユーザー定義
+  const [userList, setUserList] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("userList"));
+      return Array.isArray(saved) && saved.length > 0 ? saved : [""];
+    } catch {
+      return [""];
+    }
+  });
+//KV保存送信
 async function updatePlan(index, newPlan) {
   setPlans((prev) => {
     const updated = prev.map((p, i) => (i === index ? newPlan : p));
-
-    // 🩵 非同期でクラウド（KV）にも即反映
     (async () => {
       try {
-        // 🟢 userId を取得（localStorageに保存してある想定）
         let userId = localStorage.getItem("userId");
         if (!userId) {
           userId = "U" + Math.random().toString(36).slice(2, 6);
@@ -488,7 +153,7 @@ async function updatePlan(index, newPlan) {
         await updateTeamState({
           team: teamName,
           role,
-          userId, // 🟢 ここ追加！
+          userId, 
           topic,
           target: selectedTarget,
           scenario,
@@ -497,7 +162,7 @@ async function updatePlan(index, newPlan) {
           otherPrem,
           cause,
           idea,
-          plans: updated, // ← 全プランまとめて送信
+          plans: updated, 
         });
 
         console.log(`💾 プラン${index + 1} 保存OK (${role})`, updated[index]);
@@ -509,28 +174,10 @@ async function updatePlan(index, newPlan) {
     return updated;
   });
 }
-
-  
-  const [userList, setUserList] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("userList"));
-      return Array.isArray(saved) && saved.length > 0 ? saved : [""];
-    } catch {
-      return [""];
-    }
-  });
-  
-
-  
-  
-  
-  
-
   useEffect(()=>{localStorage.setItem("role",role);},[role]);
   useEffect(()=>{localStorage.setItem("teamName",teamName);},[teamName]);
   useEffect(()=>{localStorage.setItem("displayName",displayName);},[displayName]);
-    // 👇ここ追加（最初期に置いておく！）
-    const [portrait, setPortrait] = useState(() => window.innerHeight > window.innerWidth);
+  const [portrait, setPortrait] = useState(() => window.innerHeight > window.innerWidth);
     useEffect(() => {
       const onResize = () => setPortrait(window.innerHeight > window.innerWidth);
       window.addEventListener("resize", onResize);
@@ -543,17 +190,14 @@ async function updatePlan(index, newPlan) {
 
 
     
-
-  useEffect(() => {
+//A! INTROエフェクト
+useEffect(() => {
     if (view === "INTRO" && stage === "intro") {
       const t1 = setTimeout(() => setStage("moveUp"), 1000);
       const t2 = setTimeout(() => setStage("done"), 2300);
       return () => { clearTimeout(t1); clearTimeout(t2); };
     }
   }, [view, stage]);
-
-
-/* アニメーション段階の自動遷移 */
 useEffect(() => {
   if (stage === "intro") {
     const t1 = setTimeout(() => setStage("moveUp"), 1000);
@@ -561,18 +205,12 @@ useEffect(() => {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }
 }, [stage]);
-
-
 useEffect(() => {
   window.scrollTo(0, 0);
   document.documentElement.style.height = "100%";
   document.body.style.height = "100%";
-
-  // INTROのときだけ固定、それ以外はスクロール可
   document.body.style.overflow = view === "INTRO" ? "hidden" : "auto";
 }, [view]);
-
-/* アニメ段階の遷移 */
 useEffect(() => {
   // ①最初：拳＋タイトル中央表示 → 1秒後に上昇
   const t1 = setTimeout(() => setStage("moveUp"), 1000);
@@ -583,8 +221,6 @@ useEffect(() => {
     clearTimeout(t2);
   };
 }, []);
-
-
 useEffect(() => {
   const url = new URL(window.location.href);
   const token = url.searchParams.get("token");
@@ -598,41 +234,97 @@ useEffect(() => {
   }
 }, []);
 
+//A! 右上ログ
+function exportLogPdf(payload = {}) {
+  const pdf = new jsPDF({
+    unit: "mm",
+    format: "a4",
+  });
 
-useEffect(() => {
-  const token = localStorage.getItem("shikoUserToken");
-  if (!token) return;
+  // ★ ここが重要
+  pdf.setFont("NotoSansJP-Regular", "normal");
+  pdf.setFontSize(12);
 
-  const userKey = token.split("?")[0]; // ← ここが重要
+  let y = 15;
 
-  fetch(
-    `https://ms-engine-test.sinnosukeyamane.workers.dev/persona/getUser?user=${userKey}`
-  )
-    .then(res => res.json())
-    .then(data => setUser(data));
-}, []);
+  // ★ 日本語は配列で渡す（utf8対策）
+  pdf.text(["思考アスレチック ログ"], 10, y);
+  y += 10;
 
+  Object.entries(payload).forEach(([k, v]) => {
+    const line = `${k}: ${String(v ?? "")}`;
+    pdf.text([line], 10, y); // ← 配列！！
+    y += 8;
+  });
 
+  pdf.save("log.pdf");
+}
+//A!右上ログイン
+const sendLogin = async () => {
+  try {
+    const res = await fetch("https://ms-engine-test.sinnosukeyamane.workers.dev/persona/loginRequest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ redirect: window.location.href }),
+    });
 
-useEffect(() => {
-  if (!user) return;
+    const data = await res.json();
 
-  const fetchPlan = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_PERSONA_API_BASE}/persona/getPlan?user=${encodeURIComponent("user_" + user.email)}`
-      );
-      const data = await res.json();
-      setPlan(data.plan || "free");
-    } catch (e) {
-      console.error("plan fetch error:", e);
+    if (data.url) {
+      // Googleログイン画面（OAuth）へ飛ぶ
+      window.location.href = data.url;
+    } else {
+      alert("ログイン開始に失敗しました");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    alert("通信エラー");
+  }
+};
+//A! 背景絵文字
+function BrainShower() {
+  const containerRef = useRef(null);
+  const icons = ["🧠", "💡", "💭", "📘", "🎨", "🔎", "❓", "❗️", "👊"];
+  const intervalRef = useRef(null);
 
-  fetchPlan();
-}, [user]);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
+    // 🧠 定期的に新しいアイコンを生成して落とす
+    const createBrain = () => {
+      const span = document.createElement("span");
+      const icon = icons[Math.floor(Math.random() * icons.length)];
+      const hue = Math.floor(Math.random() * 360);
 
+      span.textContent = icon;
+      span.style.position = "absolute";
+      span.style.left = `${Math.random() * 100}%`;
+      span.style.top = "-10%";
+      span.style.fontSize = `${18 + Math.random() * 24}px`;
+      span.style.opacity = 0.6 + Math.random() * 0.4;
+      span.style.filter = `drop-shadow(0 0 3px hsl(${hue}, 80%, 70%))`;
+      span.style.animation = `fallBrain ${8 + Math.random() * 8}s linear`;
+      span.style.transform = `rotate(${Math.random() * 360}deg)`;
+      span.style.pointerEvents = "none";
+
+      // 💫 アニメーション終了後に削除
+      span.addEventListener("animationend", () => span.remove());
+
+      container.appendChild(span);
+    };
+
+    // 🌧 継続して降らせる（0.3秒ごと）
+    intervalRef.current = setInterval(createBrain, 300);
+
+    return () => {
+      clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  return <div ref={containerRef} className="brain-shower" />;
+}
+//A! 右上サブスク関数
 function SubscribeButton({ user }) {
   const [loading, setLoading] = useState(false);
 
@@ -653,10 +345,49 @@ function SubscribeButton({ user }) {
     </button>
   );
 }
+//A! 難易度関連
+const OOTB_MODE = ["easy","standard","hard"];
+const isNovelAgainst = (prev, now, thr=0.45)=> jaccard(prev||"", now||"") < thr;
+function detectPositiveOutlier(note, topic, previousNotes){
+  const txt = [note.otherPrem, note.idea, note.cause].filter(Boolean).join(" ");
+  const T   = (topic||"") + " " + txt;
+  const frameShift = /(過程|プロセス|履歴|透明性|再現|公平|代替手段|抽選|スポットチェック|口頭|録音|ランダム|申告)/.test(T);
+  const conditional = /(ただし|条件|場合|上限|下限|境界|分けて|とき|なら|条件付き)/.test(T);
+  const microTrial  = /(小さく|試(す|行)|即興|ミニ|タイムラプス|一部で|抽出|対照|パイロット|検証)/.test(T) || (note.who && note.what && note.how);
+  const hitKinds = []; if(frameShift) hitKinds.push("frame"); if(conditional) hitKinds.push("cond"); if(microTrial) hitKinds.push("trial");
+  const prev = (previousNotes||[]).slice(0,6).map(n=> n.a || n.idea || n.cause || "");
+  const novel = prev.every(p => isNovelAgainst(p, txt, 0.45));
+  return { isHit: novel && (hitKinds.length >= 2), hitKinds };
+}
+function judgeOOTB(teamNotes, mode="standard"){
+  const userNotes = teamNotes.filter(n=>n.author!=="noise");
+  let sim=0,cmp=0;
+  for(let i=1;i<userNotes.length;i++){ cmp++; if(jaccard(userNotes[i-1].a, userNotes[i].a)>0.75) sim++; }
+  const diversity = cmp ? (1 - sim/cmp) : 0;
+  let hitCount=0; const byAuthor=new Set();
+  for(let i=0;i<userNotes.length;i++){
+    const n=userNotes[i]; const prev=userNotes.slice(Math.max(0,i-6), i);
+    const { isHit } = detectPositiveOutlier(n, n.q||"", prev);
+    if(isHit){ hitCount++; byAuthor.add(n.author||""); }
+  }
+  const hasOtherPrem = userNotes.some(n=> (n.otherPrem||"").trim());
+  if(mode==="easy")    return (hitCount>=1) && (diversity>=0.20);
+  if(mode==="hard")    return (byAuthor.size>=2) && (hitCount>=2) && (diversity>=0.50) && hasOtherPrem;
+  return (hitCount>=1) && (diversity>=0.40);
+}
 
+//A! 別の議題 
+function resetAll(){
+    if(!confirm("別の議題に取り組みます。現在の入力とボード/ログ（この端末）をクリアします。よろしいですか？")) return;
+    setTopic(""); setTargetList(defaultStakeholdersFor("")); setSelectedTarget(""); setScenario(""); setScenarioDraft(""); setScenarioFixed(false);
+    setPremise(""); setTrouble(""); setOtherPrem(""); setCause(""); setIdea(""); setWho(""); setWhat(""); setHow(""); setGood(""); setBad("");
+    setNotes([]); setMatrixPos({}); histRef.current=[]; setView("FRONT");
+  }
+//A! 難易度 
+const [ootbMode,setOotbMode] = useState(()=>localStorage.getItem("ootbMode")||"standard");
+useEffect(()=>{ localStorage.setItem("ootbMode",ootbMode); },[ootbMode]);
 
-
-  // 🎤 音声入力（Web Speech API）
+  //B! 音声入力関数
 function useSpeechInput(onResult) {
   const recognitionRef = useRef(null);
   const [listening, setListening] = useState(false);
@@ -699,24 +430,79 @@ function useSpeechInput(onResult) {
   return { listening, startListening };
 }
 
+//B! 不明
+function unbox(r){
+  if (r==null) return r;
+  if (Array.isArray(r)) return r[0] ?? null;
+  if (r && Array.isArray(r.data)) return r.data[0] ?? null;
+  return r;
+}
+const toTaigen = s => String(s||"").trim().replace(/[?？。]+$/,"").replace(/(とは|はなぜ.*|について.*)$/,"") || "この議題";
+const hasCausalCue = s => /だから|ため|ので|ゆえ|せい|結果|影響|原因|引き起こ/.test(String(s||""));
+const clamp = (x,min=0,max=1)=> Math.max(min,Math.min(max,x));
+const jaccard = (a,b)=>{ const A=new Set(String(a||"").toLowerCase().split(/\s+/).filter(Boolean)); const B=new Set(String(b||"").toLowerCase().split(/\s+/).filter(Boolean)); const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size||1; return inter/uni; };
 
-  /* Topic */
+//B! 不明
+const keyPlain = s => String(s||"").replace(/\s+/g,"").replace(/[『』「」【】（）()［］\[\]、。・,.!?！？]/g,"").toLowerCase();
+function isTooClose(name, topic){
+  const a=keyPlain(name), b=keyPlain(toTaigen(topic));
+  if(!a||!b||a.length<=2) return false;
+  if (b.includes(a) || a.includes(b)) return true;
+  const A=new Set(a.split("")); const B=new Set(b.split(""));
+  const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size||1;
+  return inter/uni > 0.6;
+}
+function normalizeStakeholders(topic, names){
+  const base = defaultStakeholdersFor(topic);
+  const out=[]; for(const n of [...names,...base]){ const s=String(n||"").trim(); if(!s) continue; if(isTooClose(s, topic)) continue; if(!out.includes(s)) out.push(s); }
+  return out.slice(0,12);
+}
+//B! 議題から当事者自動選定
+function defaultStakeholdersFor(topic) {
+  const t = String(topic || "").toLowerCase();
+  const unique = new Set();
 
-  function resetAll(){
-    if(!confirm("別の議題に取り組みます。現在の入力とボード/ログ（この端末）をクリアします。よろしいですか？")) return;
-    setTopic(""); setTargetList(defaultStakeholdersFor("")); setSelectedTarget(""); setScenario(""); setScenarioDraft(""); setScenarioFixed(false);
-    setPremise(""); setTrouble(""); setOtherPrem(""); setCause(""); setIdea(""); setWho(""); setWhat(""); setHow(""); setGood(""); setBad("");
-    setNotes([]); setMatrixPos({}); histRef.current=[]; setView("FRONT");
+  // --- カテゴリ辞書 ---
+  const categories = [
+    { key: /性犯罪|暴力|虐待|誹謗|犯罪|治安/, list: ["被害当事者","加害当事者","警察","支援団体","地域住民","自治体関係者","報道関係者","法律専門家"] },
+    { key: /教育|学生|授業|大学|学校|研究|教師|学習|課題/, list: ["学生","教員","保護者","教育委員会","学校運営者","研究者","同級生","教育政策担当"] },
+    { key: /医療|病院|健康|看護|福祉|介護|ワクチン|感染/, list: ["患者","医療従事者","家族","保健所","製薬会社","自治体関係者","倫理委員会","報道関係者"] },
+    { key: /経済|企業|雇用|ビジネス|投資|景気|物価|副業/, list: ["社員","経営者","顧客","投資家","取引先","政府関係者","労働組合","地域住民"] },
+    { key: /政治|政府|政策|法律|選挙|行政|国会|制度|外交/, list: ["国民","政治家","行政職員","専門家","市民団体","報道関係者","法曹関係者","NPO関係者"] },
+    { key: /環境|自然|気候|エネルギー|原発|災害|防災|再生可能/, list: ["地域住民","専門家","政府関係者","企業","研究者","環境団体","ボランティア","教育者"] },
+    { key: /ai|人工知能|テクノロジー|機械|プログラム|開発|データ|セキュリティ/, list: ["開発者","利用者","研究者","倫理専門家","法曹関係者","企業","行政関係者","教育者"] },
+    { key: /sns|ネット|動画|投稿|炎上|フォロワー|コミュニティ|インターネット/, list: ["ユーザー","プラットフォーム運営","視聴者","広告主","報道関係者","インフルエンサー","モデレーター","被害者"] },
+    { key: /文化|芸術|音楽|映画|ゲーム|アニメ|創作|発表|表現/, list: ["制作者","観客","ファン","出版社","報道関係者","批評家","スポンサー","教育機関"] },
+    { key: /宗教|哲学|倫理|信仰|死生観|価値観|思想|信念/, list: ["信者","指導者","哲学者","研究者","宗教団体","教育者","一般市民","報道関係者"] },
+    { key: /恋愛|結婚|家族|友人|人間関係|子育て|離婚|孤独/, list: ["本人","恋人","配偶者","家族","友人","カウンセラー","SNSフォロワー","教育者"] },
+    { key: /科学|宇宙|未来|技術革新|バイオ|遺伝子|ロボット|量子/, list: ["科学者","技術者","企業","政府関係者","倫理委員会","研究機関","一般市民","学生"] },
+    { key: /国際|戦争|平和|外交|難民|条約|貿易|多文化|移民/, list: ["政府関係者","国際機関","外国人住民","市民団体","報道関係者","研究者","支援者","一般市民"] },
+    { key: /都市|交通|住宅|再開発|地域|観光|景観|まちづくり/, list: ["住民","観光客","事業者","建設業者","設計者","自治体関係者","地域団体","環境専門家"] },
+    { key: /生活|消費|食|家計|物価|サブスク|通販|電気|水道/, list: ["消費者","販売者","製造者","流通業者","金融機関","政府関係者","NPO","地域住民"] },
+    { key: /心理|メンタル|ストレス|幸福|自己肯定感|カウンセリング/, list: ["本人","家族","カウンセラー","心理学者","友人","教育者","医師","支援者"] },
+    { key: /働き方|チーム|リーダー|上司|部下|会議|評価|モチベーション/, list: ["上司","部下","人事担当","経営者","チームメンバー","コーチ","組織心理士","教育担当"] },
+    { key: /倫理|モラル|自由|規制|言論|著作権|人権|差別/, list: ["表現者","読者","規制当局","法曹関係者","報道関係者","哲学者","市民","教育者"] },
+    { key: /夢|希望|恐怖|怒り|悲しみ|未来|現実|自由|幸せ|孤独|人生|愛|死|存在|意味|心/, list: ["本人","家族","友人","心理学者","哲学者","作家","教育者","一般市民"] },
+  ];
+
+  // --- マルチマッチング ---
+  for (const c of categories) {
+    if (c.key.test(t)) {
+      c.list.forEach(x => unique.add(x));
+    }
   }
 
+  // --- 何も該当しなかった場合のフォールバック ---
+  if (unique.size === 0) {
+    ["当事者","関係者","専門家","行政関係者","研究者","支援者","一般市民"]
+      .forEach(x => unique.add(x));
+  }
+
+  return Array.from(unique);
+}
 
 
-
-  /* 難易度 */
-  const [ootbMode,setOotbMode] = useState(()=>localStorage.getItem("ootbMode")||"standard");
-  useEffect(()=>{ localStorage.setItem("ootbMode",ootbMode); },[ootbMode]);
-
-  /* AI 接続インジケータ */
+//B! LOG_AI確認
   const [aiOK,setAiOK] = useState(null); // null=未確認, true=OK, false=NG
   async function checkAI(){
     const base = (import.meta.env.VITE_PERSONA_API_BASE || "").replace(/\/$/,"");
@@ -726,7 +512,7 @@ function useSpeechInput(onResult) {
   }
   useEffect(()=>{ checkAI(); },[]);
 
-  /* Stakeholders */
+//B!1 当事者AI選定
   const [selectedTarget,setSelectedTarget] = useState("");
   useEffect(()=>{ (async ()=>{
     try{
@@ -740,7 +526,7 @@ function useSpeechInput(onResult) {
     setSelectedTarget(""); setScenario(""); setScenarioDraft(""); setScenarioFixed(false);
   })(); },[topic]);
 
-  /* Rescue scenario */
+//B!1 シナリオ内容
   const [scenario,setScenario] = useState("");
   const [scenarioDraft,setScenarioDraft] = useState("");
   const [scenarioFixed,setScenarioFixed] = useState(false);
@@ -751,7 +537,7 @@ function useSpeechInput(onResult) {
     setScenario(s); setScenarioDraft(s); setScenarioFixed(false);
   })(); },[selectedTarget]);
 
-  /* Inputs */
+//B!2 計画内容
   const [premise,setPremise] = useState("");
   const [trouble,setTrouble] = useState("");
   const [otherPrem,setOtherPrem] = useState("");
@@ -759,17 +545,115 @@ function useSpeechInput(onResult) {
   const [idea,setIdea] = useState("");
   const [who,setWho] = useState(""); const [what,setWhat] = useState(""); const [how,setHow] = useState("");
   const [good,setGood] = useState(""); const [bad,setBad] = useState("");
-  const premRef=useRef(null), ansRef=useRef(null);
 
-  /* Notes & history */
+
+//不明
   const [notes,setNotes] = useState([]);
   const currentTeam = teamName;
   const visibleNotes = useMemo(()=>notes.filter(n=>(n.team||teamName)===currentTeam),[notes,currentTeam,teamName]);
   const histRef = useRef([]);
   const teamStats = useMemo(()=>{ const U=visibleNotes.filter(n=>n.author!=="noise"); const H=U.filter(n=>n.aiTag==="H").length; const E=U.filter(n=>n.aiTag==="E").length; return {H,E}; },[visibleNotes]);
 
-  /* Flags 表示ロジック（“空欄で均”を抑止） */
-  function filterOutlierFlags(list, field, rawText){
+
+  
+//C! 偏り表示
+const OUTLIER = {
+  "断定": {
+    icon: "❗",
+    code: "断定",
+    label: "断定",
+    color: "#ef4444",
+    desc: "断定してるかも。条件を付けよう。",
+  },
+  "因果が粗い": {
+    icon: "🔄",
+    code: "因果",
+    label: "因果",
+    color: "#4aa5faff",
+    desc: "因果関係が曖昧かも。根拠をはっきりさせよう。",
+  },
+  "権威に依存": {
+    icon: "👑",
+    code: "権威",
+    label: "権威",
+    color: "#8b5cf6",
+    desc: "肩書や伝聞は本当に真実なのかな。",
+  },
+  "仮説過多(H≫E)": {
+    icon: "💭",
+    code: "仮説",
+    label: "仮説",
+    color: "#0ea5e9",
+    desc: "仮説が多いかも。事実が欲しいね。",
+  },
+  "倫理リスク": {
+    icon: "🚫",
+    code: "倫理",
+    label: "倫理",
+    color: "#f97316",
+    desc: "人権・倫理に反するかも。安全な代替を。",
+  },
+  "主観": {
+    icon: "👀",
+    code: "主観",
+    label: "主観",
+    color: "#10b981",
+    desc: "主観が強いかも。客観も足そう。",
+  },
+  "矛盾": {
+    icon: "🗡️🛡️",
+    code: "矛盾",
+    label: "矛盾",
+    color: "#e11d48",
+    desc: "条件を分けて整理しよう。",
+  },
+  "均衡": {
+    icon: "⚖️",
+    code: "均衡",
+    label: "均衡",
+    color: "#84331F",
+    desc: "バランス良し。良いね！",
+  },
+  "不明": {
+    icon: "❓",
+    code: "不明",
+    label: "不明",
+    color: "#9ca3af",
+    desc: "意味が取りづらいかも。判断要素を増やそう。",
+  },
+};
+//C! 偏り説明
+function OutlierBadges({ flags=[] }){
+  if(!Array.isArray(flags)||flags.length===0) return null;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
+      {flags.map((f,i)=>{ 
+        const m = OUTLIER[f] || {icon:"🙂",code:"",color:"#94a3b8",desc:String(f)};
+        return (
+          <div key={`${f}-${i}`} style={{display:"flex",alignItems:"center",gap:8}}>
+            {/* 丸いアイコン */}
+            <span style={{
+              display:"inline-flex",
+              alignItems:"center",
+              justifyContent:"center",
+              width:22,height:22,
+              borderRadius:"50%",
+              background:m.color,
+              color:"#fff",
+              fontSize:13,
+              flexShrink:0
+            }}>{m.icon}</span>
+            {/* コードと説明を横並び */}
+            <span style={{fontWeight:"bold",marginRight:4}}>{m.code}</span>
+            <span style={{fontSize:13,color:"#374151"}}>{m.desc}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+//C! 偏り表示関数
+function filterOutlierFlags(list, field, rawText){
     if(!Array.isArray(list)) return [];
     const txt = String(rawText||"");
     return list.filter(f=>{
@@ -783,6 +667,7 @@ function useSpeechInput(onResult) {
       return true;
     });
   }
+//C! 偏り説明関数
 function RenderFlags({ flagsForField, rawText, field, advice }) {
   if (!rawText || rawText.trim().length === 0) return null;
 
@@ -831,24 +716,96 @@ function RenderFlags({ flagsForField, rawText, field, advice }) {
     </div>
   );
 }
-
-
+//C! LOG盲点表示
+const [noiseOpen,setNoiseOpen] = useState(false);
+const [noiseData,setNoiseData] = useState([]);     // [{tag,text}]
+const [noiseLoading,setNoiseLoading] = useState(false);
+const [noiseMeta,setNoiseMeta] = useState({ source:"", noteId:"", ts:0 }); // "ai"|"templateish"|"fallback"
+function topicSnippets(topic, note){
+    const s=(topic+" "+note.premise+" "+note.idea+" "+note.cause).toLowerCase();
+    if(/レポート|ai|評価|採点|学生|教員/.test(s)){
+      return [
+        `教員向け：口頭はランダム抽出10–20%のみ。録音保存＋2名採点＋簡易ルーブリックを公開。`,
+        `学生向け：AI使用は申告＋プロンプト履歴提出を必須（未提出は減点／再評価）。`,
+        `配慮：口頭が不利な学生に動画説明や追試など同等の代替手段を規定。`,
+        `運用：オンラインは画面共有＋手元カメラを要件化（裏参照対策）。`,
+        `検証：同テーマの即興ミニ課題を本試験に1題混ぜ、理解の再現性を確認。`,
+      ];
+    }
+    if(/ひまわり|向日葵|sunflower/.test(s)){
+      return [
+        `観察：芽→蕾→開花の3段階で方位と角度を朝/昼/夕で記録。`,
+        `映像：蕾期の日周運動と開花後の固定をタイムラプスで確認。`,
+        `出題：『いつ動く？なぜ？』に分け、2択（動く/動かない）のみを避ける。`,
+        `言い換え：『向日性＝蕾の性質』と板書、誤解語『花が太陽を追う』を消す。`,
+      ];
+    }
+    return [
+      `条件分岐：うまくいく時/いかない時の違いを1行で書く。`,
+      `反対仮説：原因が逆だった場合の説明を1行で。`,
+      `検証：『誰・何・どうやって』の最小セットを1つ書いて小さく試す。`,
+    ];
+  }
+function buildConcreteProposals(n){
+    const list = topicSnippets(topic, n).map(t=>({tag:"盲点", text:t}));
+    if(!(n.trouble||"").trim()) list.push({tag:"例", text:"困っている具体例を1行（誰が/いつ/どこで）。"});
+    if(!(n.who&&n.what&&n.how)) list.push({tag:"検証", text:"『誰・何・どうやって』を1セット書いて小さく試す。"});
+    return list;
+  }
+async function openNoise(note){
+    setNoiseOpen(true); 
+    setNoiseLoading(true); 
+    setNoiseData([]);
+    const openedAt = Date.now();
+    setNoiseMeta({ source:"", noteId:note.id, ts:openedAt });
+    try {
+      const base = [note.idea, note.cause, note.premise, note.trouble]
+        .filter(Boolean).join(" / ");
   
-  const [loading, setLoading] = useState(false);
-const [evidenceHints, setEvidenceHints] = useState([]);
-const [evidenceOpen, setEvidenceOpen] = useState(false);
-
-
-
-  /* Board */
-  const [matrixSpec, setMatrixSpec] = useState("impact-feasibility");
-  const [matrixPos, setMatrixPos] = useState({});
-  const [editMatrix, setEditMatrix] = useState(false);
-  const [arranging, setArranging] = useState(false); // AI配置中フラグ
-  const matrixRef = useRef(null), dragRef = useRef(null);
+      // noise API 呼び出し
+      const r = await getNoise(topic, base);
   
-  // -------------------- ドラッグ --------------------
-  function mDown(e, key) {
+      // 正規化
+      const views = Array.isArray(r?.perspectives?.views)
+        ? r.perspectives.views
+        : Array.isArray(r?.perspectives)
+          ? r.perspectives
+          : [];
+  
+      const arr = views.map(v => ({
+        tag: v.view || "盲点",
+        blindspot: v.blindspot || "",
+        advice: v.advice || ""
+      }));
+  
+      const fallback = buildConcreteProposals(note);
+      if (arr.length === 0) {
+        setNoiseData(fallback);
+        setNoiseMeta({ source:"fallback", noteId:note.id, ts:openedAt });
+      } else {
+        setNoiseData(arr);
+        setNoiseMeta({ source:"ai", noteId:note.id, ts:openedAt });
+      }
+    } catch(e) {
+      console.error("noise error:", e);
+      setNoiseData(buildConcreteProposals(note));
+      setNoiseMeta({ source:"fallback", noteId:note.id, ts:openedAt });
+    } finally {
+      setNoiseLoading(false);
+    }
+  }
+  
+
+
+
+//D! Board定義
+const [matrixSpec, setMatrixSpec] = useState("impact-feasibility");
+const [matrixPos, setMatrixPos] = useState({});
+const [editMatrix, setEditMatrix] = useState(false);
+const [arranging, setArranging] = useState(false); // AI配置中フラグ
+const matrixRef = useRef(null), dragRef = useRef(null);
+//D! Boardドラッグ関数
+function mDown(e, key) {
     if (!editMatrix) return;
     const r = matrixRef.current.getBoundingClientRect();
     const xP = ((e.clientX - r.left) / r.width) * 100;
@@ -859,7 +816,7 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
       dy: yP - (matrixPos[key]?.yP ?? 50)
     };
   }
-  function mMove(e, key) {
+function mMove(e, key) {
     if (!editMatrix || !dragRef.current || dragRef.current.key !== key) return;
     const r = matrixRef.current.getBoundingClientRect();
     let xP = ((e.clientX - r.left) / r.width) * 100 - dragRef.current.dx;
@@ -868,10 +825,9 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
     yP = clamp(yP, 5, 95);
     setMatrixPos(p => ({ ...p, [key]: { xP, yP } }));
   }
-  const mUp = () => { dragRef.current = null; };
-  
-  // -------------------- 軸ラベル --------------------
-  function matrixLabels(spec) {
+const mUp = () => { dragRef.current = null; };
+//D! BoardUI関数(軸)
+function matrixLabels(spec) {
     switch (spec) {
       case "impact-feasibility": return [
         { k: "yH", t: "効果（高）", s: { left: "52%", top: "6%" } },
@@ -893,11 +849,8 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
       ];
     }
   }
-  
-
-
-  // -------------------- ノートをBoardに展開 --------------------
-  function flattenToBoardItems(list) {
+//D! BoardUI関数(計画内容)
+function flattenToBoardItems(list) {
     const items = [];
     list.forEach(n => {
       const base = { 
@@ -954,39 +907,7 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
   
     return items;
   }
-  
-  
-  // -------------------- 散らす --------------------
-  function spread(dict) {
-    const ks = Object.keys(dict);
-    if (!ks.length) return dict;
-    const pts = ks.map(k => ({ k, x: dict[k].xP, y: dict[k].yP }));
-    const MIN = 8;
-    for (let t = 0; t < 30; t++) {
-      let moved = false;
-      for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-          const dx = pts[j].x - pts[i].x, dy = pts[j].y - pts[i].y;
-          const d = Math.hypot(dx, dy);
-          if (d < MIN) {
-            moved = true;
-            const ang = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.3;
-            const push = (MIN - d) / 2 + 0.1;
-            pts[i].x = clamp(pts[i].x - Math.cos(ang) * push, 5, 95);
-            pts[i].y = clamp(pts[i].y - Math.sin(ang) * push, 5, 95);
-            pts[j].x = clamp(pts[j].x + Math.cos(ang) * push, 5, 95);
-            pts[j].y = clamp(pts[j].y + Math.sin(ang) * push, 5, 95);
-          }
-        }
-      }
-      if (!moved) break;
-    }
-    const out = {};
-    pts.forEach(p => out[p.k] = { xP: p.x, yP: p.y });
-    return out;
-  }
-  
-  // -------------------- 中央リセット --------------------
+//D! BoardUI関数(リセット)
   function resetMatrixCenter() {
     const items = flattenToBoardItems(visibleNotes);
     const center = {};
@@ -995,21 +916,7 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
     });
     setMatrixPos(center);
   }
-  
-
-
-  const payload = {
-    topic,
-    spec: matrixSpec,
-    notes: visibleNotes.map(it => ({
-      id: it.id,
-      title: it.title || it.idea || "無題",
-      lines: it.lines || [],
-      author: it.author || "unknown"
-    }))
-  };
-
-// -------------------- AI配置 --------------------
+//D! Board_Ai配置
 async function aiArrange() {
   if (arranging) return;
   setArranging(true);
@@ -1065,32 +972,26 @@ async function aiArrange() {
     setArranging(false);
   }
 }
-
-
-// === フォールバック用（AIが失敗したとき） ===
+//D! Board_Ai配置失敗対策
 function computeMatrixFallback() {
   return { xP: 45 + Math.random() * 10, yP: 45 + Math.random() * 10 };
 }
-
-  
-
-  // -------------------- Board初回表示で中央集合 --------------------
+//D! Board初回中央表示
   useEffect(() => {
     if (view === "BOARD") {
       resetMatrixCenter();
     }
   }, [view]);
   
-/* 終結（Canvas） */
+
+
+//A! 議論終結
 const [finalOpen,setFinalOpen] = useState(false); 
 const cvsRef = useRef(null);
-
 const sanitizeAdvice = t => String(t||"")
   .replace(/粒度/g,"具体性")
   .replace(/実行と観測のサイクルを短く回しましょう。?/g,"『だれが・何を・どうやって』まで書けると伝わる。")
   .replace(/PDCA|サイクル/g,"手順");
-
-// 長文をキャンバス幅で折り返す
 function wrapText(ctx,text,x,y,maxWidth,lineHeight){ 
   const words=text.split(/(\s+|。|、|，|,)/); let line=""; 
   for(let n=0;n<words.length;n++){ 
@@ -1100,11 +1001,9 @@ function wrapText(ctx,text,x,y,maxWidth,lineHeight){
   } 
   ctx.fillText(line,x,y); return y; 
 }
-
+//A! 議論終結(バッジ評価)
 async function runExplainLineEval(){
-  // === スピナーON ===
   setLoadingEval(true);
-
   const cvs=cvsRef.current, ctx=cvs.getContext("2d"), W=cvs.width=920, H=cvs.height=520;
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
   const grd=ctx.createLinearGradient(0,0,W,H);
@@ -1120,17 +1019,15 @@ async function runExplainLineEval(){
 
   const T=visibleNotes, out=judgeOOTB(T, ootbMode);
 
-  // === バッジ描画関数 ===
+//A! 議論終結(バッジ)関数
   function drawBadge(cx, cy, mark, color) {
     ctx.save();
     ctx.translate(cx, cy);
-
     // 円形背景
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(0, 0, 95, 0, Math.PI * 2);
     ctx.fill();
-
     // 星マーク
     ctx.fillStyle = "#fff";
     ctx.beginPath();
@@ -1145,7 +1042,6 @@ async function runExplainLineEval(){
     }
     ctx.closePath();
     ctx.fill();
-
     // ★ バッジの下に文字
     ctx.font = "bold 20px system-ui";
     ctx.fillStyle = "#333";
@@ -1153,7 +1049,6 @@ async function runExplainLineEval(){
     ctx.fillText("評価バッジ", 0, 120);
     ctx.restore();
   }
-
   // === デフォルト ===
   let badge = { mark:"—", color:"#9ca3af" }, strengths=[], improvement="", advice="";
   try { 
@@ -1166,7 +1061,6 @@ async function runExplainLineEval(){
     strengths = r?.strengths || [];
     improvement = r?.improvement || "";
     advice = sanitizeAdvice(r?.summary || r?.text || r?.advice || "");
-
     // ★ AI評価でバッジ決定
     if(r?.rank){ 
       const colors={ "秀":"#10b981","優":"#3b82f6","良":"#f59e0b","可":"#9ca3af","不可":"#ef4444","—":"#9ca3af" };
@@ -1175,16 +1069,13 @@ async function runExplainLineEval(){
   } catch(err) { 
     console.error("explainLineEval error:",err); 
   }
-
   // === バッジ描画 ===
   drawBadge(W/2, H/2 - 80, badge.mark, badge.color);
-
   if(out){
     const img=new Image();
     img.onload=()=>ctx.drawImage(img,450,110,420,300);
     img.src="/hero-ootb.jpg";
   }
-
   // === 総評描画 ===
   ctx.fillStyle="#111";
   ctx.font="bold 18px system-ui";
@@ -1203,11 +1094,9 @@ async function runExplainLineEval(){
     y = wrapText(ctx,"【改善点】",24,y,maxWidth,lineHeight)+lineHeight;
     y = wrapText(ctx,"・"+improvement,24,y,maxWidth,lineHeight)+lineHeight;
   }
-
   // === スピナーOFF ===
   setLoadingEval(false);
 }
-
 const colors = {
   "秀": "#10b981",   // 緑
   "優": "#3b82f6",   // 青
@@ -1216,91 +1105,13 @@ const colors = {
   "不可": "#ef4444", // 赤
   "—": "#9ca3af"
 };
+//A! エビデンスクエスト定義
+const [loading, setLoading] = useState(false);
+const [evidenceHints, setEvidenceHints] = useState([]);
+const [evidenceOpen, setEvidenceOpen] = useState(false);
 
 
-  /* 盲点：テンプレ落ち判定付 */
-  const [noiseOpen,setNoiseOpen] = useState(false);
-  const [noiseData,setNoiseData] = useState([]);     // [{tag,text}]
-  const [noiseLoading,setNoiseLoading] = useState(false);
-  const [noiseMeta,setNoiseMeta] = useState({ source:"", noteId:"", ts:0 }); // "ai"|"templateish"|"fallback"
-
-  function topicSnippets(topic, note){
-    const s=(topic+" "+note.premise+" "+note.idea+" "+note.cause).toLowerCase();
-    if(/レポート|ai|評価|採点|学生|教員/.test(s)){
-      return [
-        `教員向け：口頭はランダム抽出10–20%のみ。録音保存＋2名採点＋簡易ルーブリックを公開。`,
-        `学生向け：AI使用は申告＋プロンプト履歴提出を必須（未提出は減点／再評価）。`,
-        `配慮：口頭が不利な学生に動画説明や追試など同等の代替手段を規定。`,
-        `運用：オンラインは画面共有＋手元カメラを要件化（裏参照対策）。`,
-        `検証：同テーマの即興ミニ課題を本試験に1題混ぜ、理解の再現性を確認。`,
-      ];
-    }
-    if(/ひまわり|向日葵|sunflower/.test(s)){
-      return [
-        `観察：芽→蕾→開花の3段階で方位と角度を朝/昼/夕で記録。`,
-        `映像：蕾期の日周運動と開花後の固定をタイムラプスで確認。`,
-        `出題：『いつ動く？なぜ？』に分け、2択（動く/動かない）のみを避ける。`,
-        `言い換え：『向日性＝蕾の性質』と板書、誤解語『花が太陽を追う』を消す。`,
-      ];
-    }
-    return [
-      `条件分岐：うまくいく時/いかない時の違いを1行で書く。`,
-      `反対仮説：原因が逆だった場合の説明を1行で。`,
-      `検証：『誰・何・どうやって』の最小セットを1つ書いて小さく試す。`,
-    ];
-  }
-  function buildConcreteProposals(n){
-    const list = topicSnippets(topic, n).map(t=>({tag:"盲点", text:t}));
-    if(!(n.trouble||"").trim()) list.push({tag:"例", text:"困っている具体例を1行（誰が/いつ/どこで）。"});
-    if(!(n.who&&n.what&&n.how)) list.push({tag:"検証", text:"『誰・何・どうやって』を1セット書いて小さく試す。"});
-    return list;
-  }
-
-  async function openNoise(note){
-    setNoiseOpen(true); 
-    setNoiseLoading(true); 
-    setNoiseData([]);
-    const openedAt = Date.now();
-    setNoiseMeta({ source:"", noteId:note.id, ts:openedAt });
-    try {
-      const base = [note.idea, note.cause, note.premise, note.trouble]
-        .filter(Boolean).join(" / ");
-  
-      // noise API 呼び出し
-      const r = await getNoise(topic, base);
-  
-      // 正規化
-      const views = Array.isArray(r?.perspectives?.views)
-        ? r.perspectives.views
-        : Array.isArray(r?.perspectives)
-          ? r.perspectives
-          : [];
-  
-      const arr = views.map(v => ({
-        tag: v.view || "盲点",
-        blindspot: v.blindspot || "",
-        advice: v.advice || ""
-      }));
-  
-      const fallback = buildConcreteProposals(note);
-      if (arr.length === 0) {
-        setNoiseData(fallback);
-        setNoiseMeta({ source:"fallback", noteId:note.id, ts:openedAt });
-      } else {
-        setNoiseData(arr);
-        setNoiseMeta({ source:"ai", noteId:note.id, ts:openedAt });
-      }
-    } catch(e) {
-      console.error("noise error:", e);
-      setNoiseData(buildConcreteProposals(note));
-      setNoiseMeta({ source:"fallback", noteId:note.id, ts:openedAt });
-    } finally {
-      setNoiseLoading(false);
-    }
-  }
-  
-
-  /* 送信 */
+ //A! 送信ボタン
   const [sending,setSending] = useState(false);
   async function send() {
     const any = [premise, trouble, otherPrem, cause, idea, who, what, how, good, bad, ...plans.flatMap(p => Object.values(p))]
@@ -1313,7 +1124,6 @@ const colors = {
     setSending(true);
   
     try {
-      // === 同論調チェック ===
       const signature = (idea || cause || premise || trouble || otherPrem || "").trim();
       if (signature) histRef.current.push(signature);
       const h = histRef.current;
@@ -1324,12 +1134,9 @@ const colors = {
           alert("これは外れ値だが：同じ調子が続いています。視点を1つ足して条件を変えてみよう。");
         }
       }
-  
-      // === 外れ値フラグ ===
       const fields = { premise, trouble, otherPrem, cause, idea };
       const flagsDetail = {};
       let allFlags = [];
-  
       try {
         const r = await checkLogBias(topic, fields);
         for (const [key, obj] of Object.entries(r.results || {})) {
@@ -1341,7 +1148,7 @@ const colors = {
         console.error("checkLogBias error:", e);
       }
   
-      // === ノート生成 ===
+      //B!D ノート生成→すべてに統一？
       const note = {
         id: crypto.randomUUID(),
         team: teamName,
@@ -1358,19 +1165,14 @@ const colors = {
         how,
         good,
         bad,
-        plans, // ← ★ ここ！
+        plans, 
         createdAt: new Date().toISOString(),
         author: displayName || "👤",
         flagsDetail,
         allFlags,
         a: idea || cause || premise || "(入力あり)",
       };
-  
       setNotes((n) => [note, ...n]);
-  
-      // === 入力リセット ===
-
-  
       setView("LOG");
     } catch (err) {
       console.error("send error:", err);
@@ -1384,17 +1186,11 @@ const colors = {
 
 
 
-
-
-  /* Edit-mode labels */
-  const editTitle = useMemo(()=>editMatrix? "修正モードON" : "修正モードOFF",[editMatrix]);
-  const editLabel = useMemo(()=>editMatrix? "ドラッグで移動可" : "",[editMatrix]);
-
-  /* UI */
+  /*UI関連*/
   return (
     <>
-      {/* INTRO + HOME 表紙 */}
-      {view === "INTRO" && (
+{/* INTRO + HOME 表紙 */}
+  {view === "INTRO" && (
   <div className={`introWrap ${stage}`}>
     {/* 🧠 シャワーはイントロ完了後に出す */}
     {stage === "done" && <BrainShower />}
@@ -1431,12 +1227,7 @@ const colors = {
     </div>
   </div>
 )}
-
-  
-
-
-
-{/* Header */}{/* Header */}
+{/* Header */}
 {view !== "HOME" && view !== "INTRO" && (
   <>
     {/* トグルボタン（≡ / ≪） */}
@@ -1475,11 +1266,6 @@ const colors = {
       {headerOpen ? "≪" : "≡"}
     </button>
     
-
-
-
-
-{/* 🔒 右上ボタンコンテナ */}
 {/* 🔒 右上ボタンコンテナ */}
 {SHOW_DEBUG_BUTTONS && (
   <div
@@ -1493,8 +1279,6 @@ const colors = {
       gap: "12px",
     }}
   >
-
-
     {/* 📄 ログPDF */}
     <button
       onClick={() =>
@@ -1556,11 +1340,6 @@ const colors = {
     </button>
   </div>
 )}
-
-
-
-
-
 
 {/* ▼ ユーザーメニュー（ログイン中のみ） */}
 {user && showUserMenu && (
@@ -1643,10 +1422,6 @@ const colors = {
     </button>
   </div>
 )}
-
-
-
-
     {/* ヘッダー（ページ内） */}
     <div
       className="topicHead"
@@ -1663,16 +1438,11 @@ const colors = {
     </div>
   </>
 )}
-
 {showLogin && (
   <LoginModal onClose={() => setShowLogin(false)} />
 )}
-
-
 {view !== "HOME" && view !== "INTRO" && (
   <>
-
-
     {/* ヘッダー（ページ内） */}
     <div
       className="topicHead"
@@ -1717,8 +1487,6 @@ const colors = {
 >
   設定変更
 </button>
-
-
           {/* 難易度 */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span className="hint">難易度</span>
@@ -1746,9 +1514,6 @@ const colors = {
     </div>
   </>
 )}
-
-
-
 {/* 参加設定モーダル */}
 {gateOpen && (
   gateLoading ? (
@@ -1902,11 +1667,6 @@ const colors = {
 
   )
 )}
-
-
-
-
-
 {/* 終結モーダル */}
 {finalOpen && (
   <div
@@ -2032,7 +1792,7 @@ const colors = {
     </div>
   </div>
 )}
-
+{/* エビデンスクエストモーダル */}
 {evidenceOpen && (
   <div
     className="gate"
@@ -2159,13 +1919,6 @@ const colors = {
     </div>
   </div>
 )}
-
-
-
-
-
-
-
 {/* 盲点モーダル */}
 {noiseOpen && (
   <div
@@ -2312,11 +2065,7 @@ const colors = {
   </div>
 )}
 
-
-
-
-
-
+{/*FRONT*/}
 {view === "FRONT" && (
   <main
     className="container"
@@ -3485,8 +3234,250 @@ const colors = {
     </section>
   </main>
 )}
+{/* LOG */}
+{view === "LOG" && (
+  <main
+    className="container"
+    style={{
+      paddingBottom: 32,
+      display: "flex",
+      justifyContent: "center",
+    }}
+  >
+    <section
+      className="card"
+      style={{
+        background: "#f8fafc",
+        maxWidth: 720,
+        width: "100%",
+        position: "relative",
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 700,
+          marginBottom: 12,
+          fontSize: "1.1rem",
+          textAlign: "center",
+        }}
+      >
+        Log（{currentTeam}）
+      </div>
+
+      <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+        {visibleNotes.map((n) => (
+          <li
+            key={n.id}
+            style={{
+              background: "#fff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 12,
+              padding: "20px 28px",
+              marginBottom: 20,
+              lineHeight: 1.7,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
+          >
+            {/* 🕒 ヘッダー */}
+            <div
+              className="hint"
+              style={{
+                marginBottom: 6,
+                fontSize: ".9rem",
+                color: "#64748b",
+                textAlign: "center",
+              }}
+            >
+              🕒 {new Date(n.createdAt).toLocaleTimeString()}　|　{n.team} /{" "}
+              {n.author}
+            </div>
+
+            {/* 💬 質問 */}
+            <div style={{ marginBottom: 10 }}>
+              <b style={{ color: "#1e3a8a" }}>Q:</b> {n.q}
+              <div className="hint" style={{ marginTop: 2, color: "#475569" }}>
+                S: {n.scenario}
+              </div>
+            </div>
+
+{/* 🧩 各セクション */}
+{[
+  ["前提", n.premise, "premise"],
+  ["困っている具体例", n.trouble, "trouble"],
+  ["他の前提", n.otherPrem, "otherPrem"],
+  ["原因", n.cause, "cause"],
+  ["対策アイデア", n.idea, "idea"],
+].map(([label, value, key]) =>
+  value ? (
+    <div
+      key={key}
+      style={{
+        marginBottom: 14,
+        padding: "10px 12px",
+        background: "#f9fafb",
+        borderRadius: 8,
+        border: "1px solid #e5e7eb",
+      }}
+    >
+      {/* ラベル + 文章 */}
+      <div style={{ marginBottom: 6 }}>
+        <b style={{ color: "#0f172a" }}>{label}:</b>{" "}
+        <span style={{ color: "#111827" }}>{value}</span>
+      </div>
+
+      {/* RenderFlags（左揃え・自然配置） */}
+      <div style={{ marginTop: 4 }}>
+        <RenderFlags
+          flagsForField={n.flagsDetail?.[key]}
+          rawText={value}
+          field={key}
+          advice={n.flagsDetail?.[`${key}_advice`]}
+        />
+      </div>
+    </div>
+  ) : null
+)}
 
 
+            {/* 📘 計画と実行 */}
+            {Array.isArray(n.plans) && n.plans.length > 0 ? (
+              <div
+                style={{
+                  background: "#f1f5f9",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  marginTop: 12,
+                  marginBottom: 8,
+                  fontSize: ".9rem",
+                  color: "#334155",
+                }}
+              >
+                <b>計画と実行</b>
+                {n.plans.map((p, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      background: "#fff",
+                      borderRadius: 6,
+                      padding: "8px 10px",
+                      marginTop: 6,
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                      ({i + 1}) {p.who ? `${p.who}が考えた対策` : "（誰が考えたか未入力）"}
+                    </div>
+                    <div>
+                      誰が実行: {p.executor || "—"} ／ 何: {p.what || "—"} ／
+                      どうやって: {p.how || "—"}
+                    </div>
+                    <div>
+                      良い結果の予想: {p.good || "—"} ／ 良くない結果の予想:{" "}
+                      {p.bad || "—"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // 🧩 旧形式（後方互換）
+              <div
+                style={{
+                  background: "#f1f5f9",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  marginTop: 12,
+                  marginBottom: 8,
+                  fontSize: ".9rem",
+                  color: "#334155",
+                }}
+              >
+                <div>
+                  <b>計画と実行:</b> 誰={n.who || "—"} ／ 何={n.what || "—"} ／ どうやって=
+                  {n.how || "—"}
+                </div>
+                <div>
+                  結果（良い予想）: {n.good || "—"} ／ 結果（良くない予想）:{" "}
+                  {n.bad || "—"}
+                </div>
+              </div>
+            )}
+
+            {/* 🎯 ボタン行 */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: 10,
+              }}
+            >
+              <button
+                className="btn"
+                onClick={() => openNoise(n)}
+                style={{
+                  background: "#e0f2fe",
+                  color: "#0369a1",
+                  fontWeight: 600,
+                }}
+              >
+                AIからのヒント
+              </button>
+            </div>
+          </li>
+        ))}
+
+        {/* ログが空の場合 */}
+        {!visibleNotes.length && (
+          <li
+            className="hint"
+            style={{
+              textAlign: "center",
+              color: "#94a3b8",
+              padding: 20,
+              background: "#fff",
+              borderRadius: 8,
+            }}
+          >
+            （{currentTeam} のログはまだありません）
+          </li>
+        )}
+      </ul>
+
+      {/* === スピナー === */}
+      {sending && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(255,255,255,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9998,
+            backdropFilter: "blur(2px)",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              border: "4px solid #ddd",
+              borderTop: "4px solid #3b82f6",
+              borderRadius: "50%",
+              width: 48,
+              height: 48,
+              animation: "spin 1s linear infinite",
+              zIndex: 9999,
+            }}
+          />
+        </div>
+      )}
+
+
+    </section>
+  </main>
+)}
 {/* === Board === */}
 {view === "BOARD" && (
   <main className="containerWide" style={{ paddingBottom: 32, position: "relative" }}>
@@ -3883,263 +3874,6 @@ if (compactView) {
     </section>
   </main>
 )}
-
-
-
-
-
-{/* LOG */}
-{view === "LOG" && (
-  <main
-    className="container"
-    style={{
-      paddingBottom: 32,
-      display: "flex",
-      justifyContent: "center",
-    }}
-  >
-    <section
-      className="card"
-      style={{
-        background: "#f8fafc",
-        maxWidth: 720,
-        width: "100%",
-        position: "relative",
-      }}
-    >
-      <div
-        style={{
-          fontWeight: 700,
-          marginBottom: 12,
-          fontSize: "1.1rem",
-          textAlign: "center",
-        }}
-      >
-        Log（{currentTeam}）
-      </div>
-
-      <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-        {visibleNotes.map((n) => (
-          <li
-            key={n.id}
-            style={{
-              background: "#fff",
-              border: "1px solid #e2e8f0",
-              borderRadius: 12,
-              padding: "20px 28px",
-              marginBottom: 20,
-              lineHeight: 1.7,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-            }}
-          >
-            {/* 🕒 ヘッダー */}
-            <div
-              className="hint"
-              style={{
-                marginBottom: 6,
-                fontSize: ".9rem",
-                color: "#64748b",
-                textAlign: "center",
-              }}
-            >
-              🕒 {new Date(n.createdAt).toLocaleTimeString()}　|　{n.team} /{" "}
-              {n.author}
-            </div>
-
-            {/* 💬 質問 */}
-            <div style={{ marginBottom: 10 }}>
-              <b style={{ color: "#1e3a8a" }}>Q:</b> {n.q}
-              <div className="hint" style={{ marginTop: 2, color: "#475569" }}>
-                S: {n.scenario}
-              </div>
-            </div>
-
-{/* 🧩 各セクション */}
-{[
-  ["前提", n.premise, "premise"],
-  ["困っている具体例", n.trouble, "trouble"],
-  ["他の前提", n.otherPrem, "otherPrem"],
-  ["原因", n.cause, "cause"],
-  ["対策アイデア", n.idea, "idea"],
-].map(([label, value, key]) =>
-  value ? (
-    <div
-      key={key}
-      style={{
-        marginBottom: 14,
-        padding: "10px 12px",
-        background: "#f9fafb",
-        borderRadius: 8,
-        border: "1px solid #e5e7eb",
-      }}
-    >
-      {/* ラベル + 文章 */}
-      <div style={{ marginBottom: 6 }}>
-        <b style={{ color: "#0f172a" }}>{label}:</b>{" "}
-        <span style={{ color: "#111827" }}>{value}</span>
-      </div>
-
-      {/* RenderFlags（左揃え・自然配置） */}
-      <div style={{ marginTop: 4 }}>
-        <RenderFlags
-          flagsForField={n.flagsDetail?.[key]}
-          rawText={value}
-          field={key}
-          advice={n.flagsDetail?.[`${key}_advice`]}
-        />
-      </div>
-    </div>
-  ) : null
-)}
-
-
-            {/* 📘 計画と実行 */}
-            {Array.isArray(n.plans) && n.plans.length > 0 ? (
-              <div
-                style={{
-                  background: "#f1f5f9",
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  marginTop: 12,
-                  marginBottom: 8,
-                  fontSize: ".9rem",
-                  color: "#334155",
-                }}
-              >
-                <b>計画と実行</b>
-                {n.plans.map((p, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      background: "#fff",
-                      borderRadius: 6,
-                      padding: "8px 10px",
-                      marginTop: 6,
-                      border: "1px solid #e2e8f0",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                      ({i + 1}) {p.who ? `${p.who}が考えた対策` : "（誰が考えたか未入力）"}
-                    </div>
-                    <div>
-                      誰が実行: {p.executor || "—"} ／ 何: {p.what || "—"} ／
-                      どうやって: {p.how || "—"}
-                    </div>
-                    <div>
-                      良い結果の予想: {p.good || "—"} ／ 良くない結果の予想:{" "}
-                      {p.bad || "—"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              // 🧩 旧形式（後方互換）
-              <div
-                style={{
-                  background: "#f1f5f9",
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  marginTop: 12,
-                  marginBottom: 8,
-                  fontSize: ".9rem",
-                  color: "#334155",
-                }}
-              >
-                <div>
-                  <b>計画と実行:</b> 誰={n.who || "—"} ／ 何={n.what || "—"} ／ どうやって=
-                  {n.how || "—"}
-                </div>
-                <div>
-                  結果（良い予想）: {n.good || "—"} ／ 結果（良くない予想）:{" "}
-                  {n.bad || "—"}
-                </div>
-              </div>
-            )}
-
-            {/* 🎯 ボタン行 */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                marginTop: 10,
-              }}
-            >
-              <button
-                className="btn"
-                onClick={() => openNoise(n)}
-                style={{
-                  background: "#e0f2fe",
-                  color: "#0369a1",
-                  fontWeight: 600,
-                }}
-              >
-                AIからのヒント
-              </button>
-            </div>
-          </li>
-        ))}
-
-        {/* ログが空の場合 */}
-        {!visibleNotes.length && (
-          <li
-            className="hint"
-            style={{
-              textAlign: "center",
-              color: "#94a3b8",
-              padding: 20,
-              background: "#fff",
-              borderRadius: 8,
-            }}
-          >
-            （{currentTeam} のログはまだありません）
-          </li>
-        )}
-      </ul>
-
-      {/* === スピナー === */}
-      {sending && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(255,255,255,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9998,
-            backdropFilter: "blur(2px)",
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              border: "4px solid #ddd",
-              borderTop: "4px solid #3b82f6",
-              borderRadius: "50%",
-              width: 48,
-              height: 48,
-              animation: "spin 1s linear infinite",
-              zIndex: 9999,
-            }}
-          />
-        </div>
-      )}
-
-
-    </section>
-  </main>
-)}
-
-
-
-
-
-
-      
-
     </>
   );
 
