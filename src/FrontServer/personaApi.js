@@ -86,8 +86,9 @@ export const getTeamLogs = async (teamName) => {
     throw new Error(`teamLogs fetch failed: ${res.status}`);
   }
 
-  return res.json();
+  return res.json(); // { logs: [...] }
 };
+
 
 export const updateTeamState = async (teamData) => {
   const { role, team, userId } = teamData;

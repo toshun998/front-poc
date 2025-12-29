@@ -1277,13 +1277,14 @@ const [teamLogs, setTeamLogs] = useState([]);
 
 const loadTeamLogs = async () => {
   try {
-    const logs = await getTeamLogs(teamName);
-    setTeamLogs(Array.isArray(logs) ? logs : []);
+    const data = await getTeamLogs(teamName);
+    setTeamLogs(data.logs || []);
   } catch (e) {
     console.error("ログ取得失敗", e);
     setTeamLogs([]);
   }
 };
+
 
 
 
