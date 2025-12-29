@@ -24,7 +24,6 @@ const [stage, setStage] = useState("intro");
 const [topic,setTopic] = useState("");
 const [role,setRole] = useState(()=>localStorage.getItem("role")||"user");
 const [teamName,setTeamName] = useState(()=>localStorage.getItem("teamName")||"T1");
-const [displayName] = useState(()=>localStorage.getItem("displayName")||"");
 //LoadingUI定義
 const [gateLoading, setGateLoading] = useState(false);
 const [showUserMenu, setShowUserMenu] = useState(false);
@@ -174,9 +173,10 @@ async function updatePlan(index, newPlan) {
     return updated;
   });
 }
+
+
   useEffect(()=>{localStorage.setItem("role",role);},[role]);
   useEffect(()=>{localStorage.setItem("teamName",teamName);},[teamName]);
-  useEffect(()=>{localStorage.setItem("displayName",displayName);},[displayName]);
   const [portrait, setPortrait] = useState(() => window.innerHeight > window.innerWidth);
     useEffect(() => {
       const onResize = () => setPortrait(window.innerHeight > window.innerWidth);
@@ -234,31 +234,10 @@ useEffect(() => {
   }
 }, []);
 
-//A! 右上ログ
-function exportLogPdf(payload = {}) {
-  const pdf = new jsPDF({
-    unit: "mm",
-    format: "a4",
-  });
 
-  // ★ ここが重要
-  pdf.setFont("NotoSansJP-Regular", "normal");
-  pdf.setFontSize(12);
 
-  let y = 15;
 
-  // ★ 日本語は配列で渡す（utf8対策）
-  pdf.text(["思考アスレチック ログ"], 10, y);
-  y += 10;
 
-  Object.entries(payload).forEach(([k, v]) => {
-    const line = `${k}: ${String(v ?? "")}`;
-    pdf.text([line], 10, y); // ← 配列！！
-    y += 8;
-  });
-
-  pdf.save("log.pdf");
-}
 //A!右上ログイン
 const sendLogin = async () => {
   try {
@@ -345,6 +324,7 @@ function SubscribeButton({ user }) {
     </button>
   );
 }
+
 //A! 難易度関連
 const OOTB_MODE = ["easy","standard","hard"];
 const isNovelAgainst = (prev, now, thr=0.45)=> jaccard(prev||"", now||"") < thr;
@@ -375,14 +355,6 @@ function judgeOOTB(teamNotes, mode="standard"){
   if(mode==="hard")    return (byAuthor.size>=2) && (hitCount>=2) && (diversity>=0.50) && hasOtherPrem;
   return (hitCount>=1) && (diversity>=0.40);
 }
-
-//A! 別の議題 
-function resetAll(){
-    if(!confirm("別の議題に取り組みます。現在の入力とボード/ログ（この端末）をクリアします。よろしいですか？")) return;
-    setTopic(""); setTargetList(defaultStakeholdersFor("")); setSelectedTarget(""); setScenario(""); setScenarioDraft(""); setScenarioFixed(false);
-    setPremise(""); setTrouble(""); setOtherPrem(""); setCause(""); setIdea(""); setWho(""); setWhat(""); setHow(""); setGood(""); setBad("");
-    setNotes([]); setMatrixPos({}); histRef.current=[]; setView("FRONT");
-  }
 //A! 難易度 
 const [ootbMode,setOotbMode] = useState(()=>localStorage.getItem("ootbMode")||"standard");
 useEffect(()=>{ localStorage.setItem("ootbMode",ootbMode); },[ootbMode]);
@@ -1015,7 +987,8 @@ async function runExplainLineEval(){
   ctx.font="bold 24px system-ui";
   ctx.fillText("思考アスレチック® - 気づいて、協働し、調べる -",24,40);
   ctx.font="16px system-ui";
-  ctx.fillText(`チーム:${teamName} / ユーザー:${displayName||"—"} / 日付:${new Date().toLocaleDateString("ja-JP")}`,24,68);
+  ctx.fillText( `チーム:${teamName} / ユーザー:${currentUser} / 日付:${new Date().toLocaleDateString("ja-JP")}`,24,68);
+
 
   const T=visibleNotes, out=judgeOOTB(T, ootbMode);
 
@@ -1167,7 +1140,7 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
         bad,
         plans, 
         createdAt: new Date().toISOString(),
-        author: displayName || "👤",
+        author: currentUser,
         flagsDetail,
         allFlags,
         a: idea || cause || premise || "(入力あり)",
@@ -1181,8 +1154,142 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
       setSending(false);
     }
   }
-  
-  
+
+//ユーザー名定義
+const currentUser = userList?.[0] || "—";
+
+//A! 右上ログ
+function exportLogPdf(payload = {}) {
+  const pdf = new jsPDF({ unit: "mm", format: "a4" });
+  pdf.setFont("NotoSansJP-Regular", "normal");
+
+  const yRef = { y: 15 };
+  const { meta, state } = payload;
+
+  // タイトル
+  writeLine(pdf, "思考アスレチック 実行ログ", yRef, 16);
+  yRef.y += 3;
+
+  // 基本情報
+  writeLine(pdf, "【基本情報】", yRef, 12);
+  writeLine(pdf, `チーム：${meta.team}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `役割：${meta.role}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `ユーザー：${meta.user}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `日時：${meta.date}`, yRef, 11, VALUE_X);
+  yRef.y += 3;
+
+  // 議題
+  writeLine(pdf, "【議題】", yRef, 12);
+  writeLine(pdf, state.topic, yRef, 11, VALUE_X);
+  yRef.y += 3;
+
+  // 設定
+  writeLine(pdf, "【設定】", yRef, 12);
+  writeLine(pdf, `ターゲット：${state.target}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `シナリオ：${state.scenario}`, yRef, 11, VALUE_X);
+  yRef.y += 3;
+
+  // 思考整理
+  writeLine(pdf, "【思考整理】", yRef, 12);
+  writeLine(pdf, `前提：${state.premise}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `困りごと：${state.trouble}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `他の前提：${state.otherPrem}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `原因：${state.cause}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `対策：${state.idea}`, yRef, 11, VALUE_X);
+
+  // === 🔥 計画は次ページ ===
+  pdf.addPage();
+  yRef.y = 15;
+
+  writeLine(pdf, "【計画】", yRef, 14);
+  yRef.y += 4;
+
+  const PLAN_BODY_X = MARGIN_X + 10;
+  const COL_EXEC = PLAN_BODY_X;
+  const COL_WHAT = PLAN_BODY_X + 32;
+  const COL_HOW  = PLAN_BODY_X + 80;
+
+  state.plans?.forEach((p, i) => {
+    pdf.setFontSize(12);
+    pdf.text(`(${i + 1}) ${p.who || "—"}`, PLAN_BODY_X, yRef.y);
+    yRef.y += 6;
+
+    pdf.setFontSize(11);
+    pdf.text(`実行者：${p.executor || "—"}`, COL_EXEC, yRef.y);
+    pdf.text(`目的：${p.what || "—"}`, COL_WHAT, yRef.y);
+    pdf.text(`方法：${p.how || "—"}`, COL_HOW, yRef.y);
+    yRef.y += 6;
+
+    if (p.good) {
+      pdf.text(`良い予想：${p.good}`, PLAN_BODY_X, yRef.y);
+      yRef.y += 5;
+    }
+    if (p.bad) {
+      pdf.text(`悪い予想：${p.bad}`, PLAN_BODY_X, yRef.y);
+      yRef.y += 5;
+    }
+
+    yRef.y += 4;
+  });
+
+  pdf.save("log.pdf");
+}
+//A! 右上ログ出力形式定義
+const MARGIN_X = 8;
+const VALUE_X = 20; // ← 中身用（右寄せ）
+const PAGE_BOTTOM = 285;
+
+const writeLine = (pdf, text, yRef, size = 11, x = MARGIN_X) => {
+  if (yRef.y > PAGE_BOTTOM) {
+    pdf.addPage();
+    yRef.y = 15;
+  }
+  pdf.setFontSize(size);
+  pdf.setFont("NotoSansJP-Regular", "normal");
+  pdf.text([String(text ?? "")], x, yRef.y);
+  yRef.y += size + 1;
+};
+//A! 右上ログ定義
+const logPayload = {
+  meta: {
+    team: teamName,
+    role,
+    user: currentUser, 
+    date: new Date().toLocaleString("ja-JP"),
+  },
+
+  state: {
+    topic,
+    target: selectedTarget,
+    scenario,
+    premise,
+    trouble,
+    otherPrem,
+    cause,
+    idea,
+    plans,
+  },
+};
+
+//A! LOGを見る定義
+const [logOpen, setLogOpen] = useState(false);
+const [teamLogs, setTeamLogs] = useState([]);
+
+const loadTeamLogs = async () => {
+  try {
+    const logs = await getTeamLogs(teamName);
+
+    // 新しい順に
+    const sorted = Array.isArray(logs)
+      ? logs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      : [];
+
+    setTeamLogs(sorted);
+  } catch (e) {
+    console.error("ログ取得失敗", e);
+    setTeamLogs([]);
+  }
+};
 
 
 
@@ -1280,32 +1387,21 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
     }}
   >
     {/* 📄 ログPDF */}
-    <button
-      onClick={() =>
-        exportLogPdf({
-          team: teamName,
-          role,
-          topic,
-          target: selectedTarget,
-          scenario,
-          premise,
-          trouble,
-          cause,
-          idea,
-        })
-      }
-      style={{
-        padding: "10px 18px",
-        background: "#333",
-        color: "#fff",
-        border: "none",
-        borderRadius: "10px",
-        fontSize: "15px",
-        cursor: "pointer",
-      }}
-    >
-      🧾 ログPDF
-    </button>
+<button
+  onClick={() => exportLogPdf(logPayload)}
+  style={{
+    padding: "10px 18px",
+    background: "#333",
+    color: "#fff",
+    border: "none",
+    borderRadius: "10px",
+    fontSize: "15px",
+    cursor: "pointer",
+  }}
+>
+  🧾 ログPDF
+</button>
+
 
     {/* 🪙 サブスク */}
     <button
@@ -1467,10 +1563,70 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
             flexWrap: "wrap",
           }}
         >
-          <button className="btn" onClick={() => { setView("INTRO"); setStage("intro"); setTimeout(() => setStage("moveUp"), 1000);
- setTimeout(() => setStage("done"), 2300) }}>表紙へ</button>
-          <button className="btn" onClick={resetAll}>別の議題</button>
+          <button className="btn" onClick={() => { setView("INTRO"); setStage("intro"); setTimeout(() => setStage("moveUp"), 1000);setTimeout(() => setStage("done"), 2300) }}>表紙へ</button>
           <button className="btn" onClick={() => { setFinalOpen(true); setTimeout(runExplainLineEval, 10); }}>議論終結</button>
+<button
+  className="btn"
+  onClick={async () => {
+    setLogOpen(true);
+    await loadTeamLogs(); // ← 追加
+  }}
+>
+  LOGを見る
+</button>
+{logOpen && (
+  <div
+    className="gate"
+    onClick={(e) => {
+      if (e.target.classList.contains("gate")) setLogOpen(false);
+    }}
+  >
+    <div className="panel" style={{ maxWidth: 720 }}>
+      <h3>チーム内ログ（{teamName}）</h3>
+
+      {teamLogs.length === 0 && (
+        <div className="hint">まだログはありません</div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {teamLogs.map((log, i) => (
+          <div
+            key={i}
+            style={{
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              padding: 10,
+              background: "#fafafa",
+            }}
+          >
+            <div style={{ fontWeight: "bold" }}>
+              👤 {log.author}
+            </div>
+            <div className="hint">
+              {log.createdAt
+                ? new Date(log.createdAt).toLocaleString("ja-JP")
+                : "—"}
+            </div>
+
+            <div style={{ marginTop: 6 }}>
+              <div><b>何を：</b>{log.what || "—"}</div>
+              <div><b>どうやって：</b>{log.how || "—"}</div>
+              <div><b>良い予想：</b>{log.good || "—"}</div>
+              <div><b>悪い予想：</b>{log.bad || "—"}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 12, textAlign: "right" }}>
+        <button className="btn" onClick={() => setLogOpen(false)}>
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 {/* 設定変更ボタン */}
 <button
   className="btn"

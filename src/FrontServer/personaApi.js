@@ -77,6 +77,10 @@ export const getTeamState = async (teamName, userId) => {
   return teamData;
 };
 
+export const getTeamLogs = (team) =>
+  fetch(`${BASE}/persona/teamLogs?team=${encodeURIComponent(team)}`)
+    .then(r => r.json());
+
 export const updateTeamState = async (teamData) => {
   const { role, team, userId } = teamData;
 
