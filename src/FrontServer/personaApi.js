@@ -77,9 +77,21 @@ export const getTeamState = async (teamName, userId) => {
   return teamData;
 };
 
-export const getTeamLogs = (team) =>
-  fetch(`${BASE}/persona/teamLogs?team=${encodeURIComponent(team)}`)
-    .then(r => r.json());
+export const getTeamLogs = async (teamName) => {
+  const res = await fetch(
+    `${BASE}/persona/teamLogs?team=${encodeURIComponent(teamName)}`,
+    {
+      method: "GET",
+      headers,
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`teamLogs fetch failed: ${res.status}`);
+  }
+
+  return res.json();
+};
 
 export const updateTeamState = async (teamData) => {
   const { role, team, userId } = teamData;
