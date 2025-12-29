@@ -52,6 +52,22 @@ export const evidenceQuest = (topic, teamName, notes = []) =>
   post("/persona/evidenceQuest", { topic, teamName, notes });
 
 // 5. TeamState（KV）
+
+export const getTeamLogs = async (teamName) => {
+  const res = await fetch(
+    `${BASE}/persona/teamLogs?team=${encodeURIComponent(teamName)}`,
+    { method: "GET", headers }
+  );
+
+  if (!res.ok) {
+    throw new Error(`teamLogs fetch failed: ${res.status}`);
+  }
+
+  return res.json();
+};
+
+
+
 export const getTeamState = async (teamName, userId) => {
   const teamUrl = `${BASE}/persona/teamState?team=${encodeURIComponent(teamName)}`;
   const teamRes = await fetch(teamUrl, { headers });
@@ -75,22 +91,6 @@ export const getTeamState = async (teamName, userId) => {
   }
 
   return teamData;
-};
-
-export const getTeamLogs = async (teamName) => {
-  const res = await fetch(
-    `${BASE}/persona/teamLogs?team=${encodeURIComponent(teamName)}`,
-    {
-      method: "GET",
-      headers,
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error(`teamLogs fetch failed: ${res.status}`);
-  }
-
-  return res.json();
 };
 
 export const updateTeamState = async (teamData) => {

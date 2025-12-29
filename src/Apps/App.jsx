@@ -1278,18 +1278,14 @@ const [teamLogs, setTeamLogs] = useState([]);
 const loadTeamLogs = async () => {
   try {
     const logs = await getTeamLogs(teamName);
-
-    // 新しい順に
-    const sorted = Array.isArray(logs)
-      ? logs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      : [];
-
-    setTeamLogs(sorted);
+    setTeamLogs(Array.isArray(logs) ? logs : []);
   } catch (e) {
     console.error("ログ取得失敗", e);
     setTeamLogs([]);
   }
 };
+
+
 
 
 
