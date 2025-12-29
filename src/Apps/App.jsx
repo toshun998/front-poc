@@ -345,10 +345,11 @@ function SubscribeButton({ user }) {
 
   return (
     <button className="btnDark" onClick={handleSubscribe} disabled={loading}>
-      {loading ? "接続中..." : "💳 プレミアム登録する"}
+      {loading ? "接続中..." : "🪙サブスク"}
     </button>
   );
 }
+
 
 //A! 難易度関連
 const OOTB_MODE = ["easy","standard","hard"];
@@ -1189,7 +1190,7 @@ function exportLogPdf(payload = {}) {
   pdf.setFont("NotoSansJP-Regular", "normal");
 
   const yRef = { y: 15 };
-  const { meta, state } = payload;
+  const { meta = {}, state = {} } = payload;
 
   // タイトル
   writeLine(pdf, "思考アスレチック 実行ログ", yRef, 16);
@@ -1197,32 +1198,32 @@ function exportLogPdf(payload = {}) {
 
   // 基本情報
   writeLine(pdf, "【基本情報】", yRef, 12);
-  writeLine(pdf, `チーム：${meta.team}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `役割：${meta.role}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `ユーザー：${meta.user}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `日時：${meta.date}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `チーム：${meta.team ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `役割：${meta.role ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `ユーザー：${meta.user ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `日時：${meta.date ?? "—"}`, yRef, 11, VALUE_X);
   yRef.y += 3;
 
   // 議題
   writeLine(pdf, "【議題】", yRef, 12);
-  writeLine(pdf, state.topic, yRef, 11, VALUE_X);
+  writeLine(pdf, state.topic ?? "—", yRef, 11, VALUE_X);
   yRef.y += 3;
 
   // 設定
   writeLine(pdf, "【設定】", yRef, 12);
-  writeLine(pdf, `ターゲット：${state.target}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `シナリオ：${state.scenario}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `ターゲット：${state.target ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `シナリオ：${state.scenario ?? "—"}`, yRef, 11, VALUE_X);
   yRef.y += 3;
 
   // 思考整理
   writeLine(pdf, "【思考整理】", yRef, 12);
-  writeLine(pdf, `前提：${state.premise}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `困りごと：${state.trouble}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `他の前提：${state.otherPrem}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `原因：${state.cause}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `対策：${state.idea}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `前提：${state.premise ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `困りごと：${state.trouble ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `他の前提：${state.otherPrem ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `原因：${state.cause ?? "—"}`, yRef, 11, VALUE_X);
+  writeLine(pdf, `対策：${state.idea ?? "—"}`, yRef, 11, VALUE_X);
 
-  // === 🔥 計画は次ページ ===
+  // === 計画は次ページ ===
   pdf.addPage();
   yRef.y = 15;
 
@@ -1234,7 +1235,7 @@ function exportLogPdf(payload = {}) {
   const COL_WHAT = PLAN_BODY_X + 32;
   const COL_HOW  = PLAN_BODY_X + 80;
 
-  state.plans?.forEach((p, i) => {
+  (state.plans || []).forEach((p = {}, i) => {
     pdf.setFontSize(12);
     pdf.text(`(${i + 1}) ${p.who || "—"}`, PLAN_BODY_X, yRef.y);
     yRef.y += 6;
@@ -1257,8 +1258,19 @@ function exportLogPdf(payload = {}) {
     yRef.y += 4;
   });
 
-  pdf.save("log.pdf");
+  // === 🔽 ファイル名生成（安全対策込み） ===
+  const safe = (s) => String(s || "").replace(/[\\/:*?"<>|]/g, "_").trim();
+  const team = safe(meta.team) || "team";
+  const user = safe(meta.user) || "user";
+  const date = safe(meta.date)?.replace(/[^\d]/g, "") || "";
+
+  const filename = date
+    ? `${team}_${user}_${date}.pdf`
+    : `${team}_${user}.pdf`;
+
+  pdf.save(filename);
 }
+
 //A! 右上ログ出力形式定義
 const MARGIN_X = 8;
 const VALUE_X = 20; // ← 中身用（右寄せ）
@@ -1513,20 +1525,8 @@ useEffect(() => {
 
 
     {/* 🪙 サブスク */}
-    <button
-      onClick={() => {}}
-      style={{
-        padding: "10px 18px",
-        background: "#333",
-        color: "#fff",
-        border: "none",
-        borderRadius: "10px",
-        fontSize: "15px",
-        cursor: "pointer",
-      }}
-    >
-      🪙 サブスク
-    </button>
+<SubscribeButton user={currentUser} />
+
 
     {/* 🔑 ログイン */}
     <button
