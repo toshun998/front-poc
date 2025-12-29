@@ -1,8 +1,26 @@
 ﻿//React
 import { useEffect, useMemo, useRef, useState } from "react";
 //personaApi
-import {getTeamLogs,getTargets,explainLineEval as explainLineEvalApi,checkLogBias,getNoise,arrangeBoard,evidenceQuest,getTeamState,updateTeamState,subscribePlan,
+import {
+  // LOG / 個人保存
+  getTeamUserStates,
+  saveUserState,
+
+  // Persona / AI
+  getTargets,
+  explainLineEval as explainLineEvalApi,
+  checkLogBias,
+  getNoise,
+  arrangeBoard,
+  evidenceQuest,
+
+  // チーム情報（参照のみ）
+  getTeamState,
+
+  // 課金
+  subscribePlan,
 } from "../FrontServer/personaApi";
+
 //Styles
 import "./App.css";
 //Img
@@ -16,6 +34,9 @@ import "../Assets/NotoSansJP-Regular-normal";
 
 /* ========== App ========== */
 export default function App(){
+//2秒ごと保存定義
+const lastSavedRef = useRef("");
+
 const SHOW_DEBUG_BUTTONS = true;
 //Intro定義
 const [view, setView] = useState("INTRO");
@@ -137,22 +158,27 @@ const { listening: badListening, startListening: startBadListening } =
       return [""];
     }
   });
-//KV保存送信
+  
+
+// KV保存送信（userState 専用）
 async function updatePlan(index, newPlan) {
   setPlans((prev) => {
     const updated = prev.map((p, i) => (i === index ? newPlan : p));
+
+    // 🔽 非同期保存（userState）
     (async () => {
       try {
+        // userId は人格なので一度決めたら固定
         let userId = localStorage.getItem("userId");
         if (!userId) {
-          userId = "U" + Math.random().toString(36).slice(2, 6);
+          userId = "U" + crypto.randomUUID().slice(0, 8);
           localStorage.setItem("userId", userId);
         }
 
-        await updateTeamState({
+        await saveUserState({
           team: teamName,
-          role,
-          userId, 
+          author: userId, // 表示用（LOG用）
+
           topic,
           target: selectedTarget,
           scenario,
@@ -161,12 +187,12 @@ async function updatePlan(index, newPlan) {
           otherPrem,
           cause,
           idea,
-          plans: updated, 
+          plans: updated,
         });
 
-        console.log(`💾 プラン${index + 1} 保存OK (${role})`, updated[index]);
+        console.log(`💾 プラン${index + 1} 個人保存OK`, updated[index]);
       } catch (err) {
-        console.error(`❌ プラン${index + 1} 保存失敗`, err);
+        console.error(`❌ プラン${index + 1} 個人保存失敗`, err);
       }
     })();
 
@@ -189,7 +215,6 @@ async function updatePlan(index, newPlan) {
     }, []);
 
 
-    
 //A! INTROエフェクト
 useEffect(() => {
     if (view === "INTRO" && stage === "intro") {
@@ -1273,20 +1298,108 @@ const logPayload = {
 
 //A! LOGを見る定義
 const [logOpen, setLogOpen] = useState(false);
-const [teamLogs, setTeamLogs] = useState([]);
+const [userLogs, setUserLogs] = useState([]);
+const [selectedUserId, setSelectedUserId] = useState(null);
+const [selectedLog, setSelectedLog] = useState(null);
 
-const loadTeamLogs = async () => {
-  try {
-    const data = await getTeamLogs(teamName);
-    setTeamLogs(data.logs || []);
-  } catch (e) {
-    console.error("ログ取得失敗", e);
-    setTeamLogs([]);
-  }
-};
+//A! 参加設定定義
+const [currentUserId, setCurrentUserId] = useState(null);
+const [currentUserName, setCurrentUserName] = useState(null);
 
 
+//A! 参加設定エフェクト
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const team = params.get("team");
+  const userId = params.get("user"); // ★ team を含まない
 
+  if (!team || !userId) return;
+
+  setTeamName(team);
+  setCurrentUserId(userId);
+  setCurrentUserName(userId);
+
+  localStorage.setItem("teamName", team);
+  localStorage.setItem("currentUserId", userId);
+  localStorage.setItem("currentUserName", userId);
+  localStorage.setItem("role", "user");
+
+  console.log("👤 個人ページ初期化:", { team, userId });
+
+  (async () => {
+    const res = await getTeamUserStates(team);
+    const my = res.users.find((u) => u.userId === userId);
+    if (!my) return;
+
+    setTopic(my.topic || "");
+    setSelectedTarget(my.target || "");
+    setScenario(my.scenario || "");
+    setPremise(my.premise || "");
+    setTrouble(my.trouble || "");
+    setOtherPrem(my.otherPrem || "");
+    setCause(my.cause || "");
+    setIdea(my.idea || "");
+    setPlans(Array.isArray(my.plans) ? my.plans : []);
+  })();
+}, []);
+
+
+
+//A! 2秒後保存エフェクト
+useEffect(() => {
+  const interval = setInterval(() => {
+    // 🔒 必須情報が揃うまで保存しない
+    if (!teamName || !currentUserId || !currentUserName) return;
+
+    const snapshot = JSON.stringify({
+      topic,
+      selectedTarget,
+      scenario,
+      premise,
+      trouble,
+      otherPrem,
+      cause,
+      idea,
+      plans,
+    });
+
+    if (snapshot === lastSavedRef.current) return;
+
+    console.log("⏱ autosave");
+
+    saveUserState({
+      team: teamName,
+      userId: currentUserId,
+      author: currentUserName,
+      topic,
+      target: selectedTarget,
+      scenario,
+      premise,
+      trouble,
+      otherPrem,
+      cause,
+      idea,
+      plans,
+    });
+
+    lastSavedRef.current = snapshot;
+  }, 2000);
+
+  return () => clearInterval(interval);
+}, [
+  teamName,
+  currentUserId,
+  currentUserName,
+  topic,
+  selectedTarget,
+  scenario,
+  premise,
+  trouble,
+  otherPrem,
+  cause,
+  idea,
+  plans,
+]);
 
 
   /*UI関連*/
@@ -1561,61 +1674,139 @@ const loadTeamLogs = async () => {
         >
           <button className="btn" onClick={() => { setView("INTRO"); setStage("intro"); setTimeout(() => setStage("moveUp"), 1000);setTimeout(() => setStage("done"), 2300) }}>表紙へ</button>
           <button className="btn" onClick={() => { setFinalOpen(true); setTimeout(runExplainLineEval, 10); }}>議論終結</button>
+
 <button
   className="btn"
   onClick={async () => {
     setLogOpen(true);
-    await loadTeamLogs(); // ← 追加
+    const res = await getTeamUserStates(teamName);
+    setUserLogs(res.users || []);
+    setSelectedUserId(null);
   }}
 >
   LOGを見る
 </button>
+
+
+
+
 {logOpen && (
   <div
     className="gate"
     onClick={(e) => {
-      if (e.target.classList.contains("gate")) setLogOpen(false);
+      if (e.target.classList.contains("gate")) {
+        setLogOpen(false);
+        setSelectedLog(null);
+      }
     }}
   >
-    <div className="panel" style={{ maxWidth: 720 }}>
-      <h3>チーム内ログ（{teamName}）</h3>
+    <div className="panel" style={{ maxWidth: 800 }}>
+      <h3>個人ログ（{teamName}）</h3>
 
-      {teamLogs.length === 0 && (
-        <div className="hint">まだログはありません</div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {teamLogs.map((log, i) => (
-          <div
-            key={i}
+      {/* 👤 ユーザー一覧 */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          marginBottom: 12,
+        }}
+      >
+        {userList.map((name) => (
+          <button
+            key={name}
+            className="btn"
             style={{
-              border: "1px solid #e5e7eb",
-              borderRadius: 8,
-              padding: 10,
-              background: "#fafafa",
+              background:
+                selectedLog?.author === name
+                  ? "#2563eb"
+                  : "#e5e7eb",
+              color:
+                selectedLog?.author === name
+                  ? "#fff"
+                  : "#111",
+              cursor: "pointer",
+            }}
+            onClick={() => {
+              // ★ 名前に関係なく「表示できるログ」を必ず拾う
+              const hit =
+                userLogs.find((l) => l.author?.includes(name)) ||
+                userLogs[0]; // ← 最後の保険
+
+              setSelectedLog(hit || null);
             }}
           >
-            <div style={{ fontWeight: "bold" }}>
-              👤 {log.author}
-            </div>
-            <div className="hint">
-              {log.createdAt
-                ? new Date(log.createdAt).toLocaleString("ja-JP")
-                : "—"}
-            </div>
-
-            <div style={{ marginTop: 6 }}>
-              <div><b>何を：</b>{log.what || "—"}</div>
-              <div><b>どうやって：</b>{log.how || "—"}</div>
-              <div><b>良い予想：</b>{log.good || "—"}</div>
-              <div><b>悪い予想：</b>{log.bad || "—"}</div>
-            </div>
-          </div>
+            {name}
+          </button>
         ))}
       </div>
 
+      {/* 📄 ログ表示 */}
+      {!selectedLog && (
+        <div className="hint">上の名前を選択してください</div>
+      )}
+
+      {selectedLog && (
+        <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+          <div className="hint" style={{ marginBottom: 6 }}>
+            最終更新：
+            {selectedLog.updatedAt
+              ? new Date(selectedLog.updatedAt).toLocaleString("ja-JP")
+              : "—"}
+          </div>
+
+          <hr />
+
+          <div><b>議題：</b>{selectedLog.topic || "—"}</div>
+          <div><b>ターゲット：</b>{selectedLog.target || "—"}</div>
+          <div><b>シナリオ：</b>{selectedLog.scenario || "—"}</div>
+
+          <hr />
+
+          <div><b>前提</b><br />{selectedLog.premise || "—"}</div>
+          <div><b>困りごと</b><br />{selectedLog.trouble || "—"}</div>
+          <div><b>他の前提</b><br />{selectedLog.otherPrem || "—"}</div>
+          <div><b>原因</b><br />{selectedLog.cause || "—"}</div>
+          <div><b>対策</b><br />{selectedLog.idea || "—"}</div>
+
+          <hr />
+
+          <b>計画</b>
+          {Array.isArray(selectedLog.plans) &&
+          selectedLog.plans.length > 0 ? (
+            selectedLog.plans.map((p, i) => (
+              <div
+                key={`${selectedLog.userId || "log"}-${i}`}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 6,
+                  padding: 8,
+                  marginTop: 8,
+                  background: "#fafafa",
+                }}
+              >
+                <div><b>考案者：</b>{p.who || "—"}</div>
+                <div><b>実行者：</b>{p.executor || "—"}</div>
+                <div><b>何を：</b>{p.what || "—"}</div>
+                <div><b>どうやって：</b>{p.how || "—"}</div>
+                <div><b>良い予想：</b>{p.good || "—"}</div>
+                <div><b>悪い予想：</b>{p.bad || "—"}</div>
+              </div>
+            ))
+          ) : (
+            <div className="hint">計画はありません</div>
+          )}
+        </div>
+      )}
+
       <div style={{ marginTop: 12, textAlign: "right" }}>
-        <button className="btn" onClick={() => setLogOpen(false)}>
+        <button
+          className="btn"
+          onClick={() => {
+            setLogOpen(false);
+            setSelectedLog(null);
+          }}
+        >
           閉じる
         </button>
       </div>
@@ -1623,22 +1814,41 @@ const loadTeamLogs = async () => {
   </div>
 )}
 
+
+
+
+
+
 {/* 設定変更ボタン */}
 <button
   className="btn"
   onClick={() => {
-    // 💡 開く直前に localStorage の内容を再読込
+    // 💡 userList 再読込
     try {
       const saved = JSON.parse(localStorage.getItem("userList"));
       if (Array.isArray(saved) && saved.length > 0) {
         setUserList(saved);
+
+        // ✅ activeUser 未設定なら先頭を編集対象にする
+        if (!activeUserId) {
+          const firstName = saved[0];
+          const uid = `U_${firstName}`; // ← 例（userId体系に合わせてOK）
+
+          setActiveUserId(uid);
+          setActiveUserName(firstName);
+
+          localStorage.setItem("activeUserId", uid);
+          localStorage.setItem("activeUserName", firstName);
+        }
       }
     } catch {}
+
     setGateOpen(true);
   }}
 >
   設定変更
 </button>
+
           {/* 難易度 */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span className="hint">難易度</span>
@@ -1666,11 +1876,14 @@ const loadTeamLogs = async () => {
     </div>
   </>
 )}
+
+
+
 {/* 参加設定モーダル */}
 {gateOpen && (
   gateLoading ? (
 
-    // 🌀 ローディング中は Gate を描画せず、これだけを表示
+    // 🌀 ローディング中
     <div className="gate">
       <div className="panel">
         <p>読み込み中です…</p>
@@ -1679,7 +1892,6 @@ const loadTeamLogs = async () => {
 
   ) : (
 
-    // 🟦 データ準備完了後に描画する Gate UI
     <div
       className="gate"
       onClick={(e) => {
@@ -1689,7 +1901,7 @@ const loadTeamLogs = async () => {
       <div className="panel">
         <h3>参加設定</h3>
 
-        {/* === 役割 === */}
+        {/* === 役割（※残すが今は使わない） === */}
         <div className="row">
           <span className="hint" style={{ width: 90 }}>役割</span>
           <select value={role} onChange={(e) => setRole(e.target.value)}>
@@ -1709,13 +1921,16 @@ const loadTeamLogs = async () => {
           />
         </div>
 
-        {/* === ユーザー名 === */}
+        {/* === ユーザー名一覧 === */}
         <div className="row" style={{ alignItems: "flex-start" }}>
           <span className="hint" style={{ width: 90 }}>ユーザー名</span>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
             {userList.map((u, i) => (
-              <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div
+                key={i}
+                style={{ display: "flex", gap: 6, alignItems: "center" }}
+              >
                 <input
                   value={u}
                   onChange={(e) => {
@@ -1727,6 +1942,38 @@ const loadTeamLogs = async () => {
                   style={{ flex: 1 }}
                 />
 
+                {/* 👤 この人で入る（個人ページを開く） */}
+<button
+  className="btnDark"
+onClick={() => {
+  if (!u.trim()) {
+    alert("名前を入力してください");
+    return;
+  }
+
+  const uid = u; // ★ここが最重要
+
+  localStorage.setItem("currentUserName", u);
+  localStorage.setItem("currentUserId", uid);
+  localStorage.setItem("teamName", teamName);
+
+  const url =
+    `${window.location.origin}` +
+    `/?team=${encodeURIComponent(teamName)}` +
+    `&user=${encodeURIComponent(uid)}`;
+
+  window.open(url, "_blank");
+  setGateOpen(false);
+}}
+
+>
+  入る
+</button>
+
+
+
+
+                {/* 追加 / 削除 */}
                 {i === 0 ? (
                   <button
                     className="btn"
@@ -1738,9 +1985,6 @@ const loadTeamLogs = async () => {
                       borderRadius: 8,
                       background: "#e5e7eb",
                       color: "#2563eb",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
                     }}
                   >
                     ＋
@@ -1760,9 +2004,6 @@ const loadTeamLogs = async () => {
                       border: "1.5px solid #b91c1c",
                       background: "#fee2e2",
                       color: "#b91c1c",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
                     }}
                   >
                     −
@@ -1773,52 +2014,31 @@ const loadTeamLogs = async () => {
           </div>
         </div>
 
-        {/* === OKボタン === */}
+        {/* === 名簿保存だけする === */}
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button
-            className="btnDark"
+            className="btn"
             style={{ marginTop: 20 }}
-            onClick={async () => {
-              setGateLoading(true); // ⬅ ここでローディング開始
-
+            onClick={() => {
               const cleaned = userList.map((u) => u.trim());
               setUserList(cleaned);
               localStorage.setItem("userList", JSON.stringify(cleaned));
               localStorage.setItem("teamName", teamName);
               localStorage.setItem("role", role);
-
-              try {
-                const teamData = await getTeamState(teamName);
-
-                if (teamData?.topic) setTopic(teamData.topic);
-                if (teamData?.board) setBoard(teamData.board);
-                if (teamData?.target) setSelectedTarget(teamData.target);
-                if (teamData?.scenario) setScenario(teamData.scenario);
-                if (teamData?.premise) setPremise(teamData.premise);
-                if (teamData?.trouble) setTrouble(teamData.trouble);
-                if (teamData?.otherPrem) setOtherPrem(teamData.otherPrem);
-                if (teamData?.cause) setCause(teamData.cause);
-                if (teamData?.idea) setIdea(teamData.idea);
-                if (teamData?.plans) setPlans(teamData.plans);
-
-                console.log(`🟢 チーム ${teamName} に参加しました`, teamData);
-              } catch (err) {
-                console.warn(`⚠️ チーム ${teamName} の読み込みに失敗`, err);
-              }
-
-              setGateLoading(false); // ⬅ データ読み込み終わり
-              setGateOpen(false);    // ⬅ ここで初めて閉じる
+              setGateOpen(false);
             }}
           >
-            保存して閉じる
+            名簿を保存
           </button>
         </div>
 
       </div>
     </div>
-
   )
 )}
+
+
+
 {/* 終結モーダル */}
 {finalOpen && (
   <div
@@ -2252,8 +2472,6 @@ const loadTeamLogs = async () => {
       {page === 1 && (
         <>
 {/* Step 1: 議題 */}
-
-
 <div className="card" id="card1">
   <h3 style={{ marginBottom: 8 }}>① 議題を決めよう</h3>
 
@@ -2262,36 +2480,8 @@ const loadTeamLogs = async () => {
 
     <input
       value={topic}
-      onChange={async (e) => {
-        const newTopic = e.target.value;
-        setTopic(newTopic);
-
-        try {
-          // 🟢 userIdを取得・確保
-          let userId = localStorage.getItem("userId");
-          if (!userId) {
-            userId = "U" + Math.random().toString(36).slice(2, 6);
-            localStorage.setItem("userId", userId);
-          }
-
-          await updateTeamState({
-            team: teamName,
-            role,
-            userId, // ✅ ここ追加
-            topic: newTopic,
-            target: selectedTarget,
-            scenario,
-            premise,
-            trouble,
-            otherPrem,
-            cause,
-            idea,
-          });
-
-          console.log(`💾 topic 更新OK (${role})`, newTopic);
-        } catch (err) {
-          console.error("❌ topic 保存失敗:", err);
-        }
+      onChange={(e) => {
+        setTopic(e.target.value);
       }}
       placeholder="話し合いたいテーマを書こう"
       style={{
@@ -2303,7 +2493,7 @@ const loadTeamLogs = async () => {
       }}
     />
 
-    {/* 🎤 音声入力ボタン */}
+    {/* 🎤 音声入力ボタン（そのままでOK） */}
     <button
       onClick={startListening}
       style={{
@@ -2321,11 +2511,46 @@ const loadTeamLogs = async () => {
       {listening ? "🎙️" : "🎤"}
     </button>
 
-    <button className="btn" style={{ height: "32px" }}>
+    {/* ✅ 明示保存 */}
+    <button
+      className="btn"
+      style={{ height: "32px" }}
+      onClick={async () => {
+        try {
+          let userId = localStorage.getItem("userId");
+          if (!userId) {
+            userId = "U" + crypto.randomUUID().slice(0, 8);
+            localStorage.setItem("userId", userId);
+          }
+await saveUserState({
+  team: teamName,
+
+  userId: currentUserId,        // ← 保存キー用（必須）
+  author: currentUserName,      // ← 表示名
+
+  topic,
+  target: selectedTarget,
+  scenario,
+  premise,
+  trouble,
+  otherPrem,
+  cause,
+  idea,
+  plans,
+});
+
+
+          console.log("💾 topic 個人保存OK", topic);
+        } catch (err) {
+          console.error("❌ topic 個人保存失敗", err);
+        }
+      }}
+    >
       OK
     </button>
   </div>
 </div>
+
 
 
 
@@ -2339,34 +2564,8 @@ const loadTeamLogs = async () => {
       <button
         key={n}
         className={selectedTarget === n ? "btnDark" : "btn"}
-        onClick={async () => {
+        onClick={() => {
           setSelectedTarget(n);
-
-          try {
-            // 🟢 userIdを確保
-            let userId = localStorage.getItem("userId");
-            if (!userId) {
-              userId = "U" + Math.random().toString(36).slice(2, 6);
-              localStorage.setItem("userId", userId);
-            }
-
-            await updateTeamState({
-              team: teamName,
-              role,
-              userId, // ✅ 追加
-              topic,
-              target: n,
-              scenario,
-              premise,
-              trouble,
-              otherPrem,
-              cause,
-              idea,
-            });
-            console.log(`💾 助けたい人 更新 (${role})`, n);
-          } catch (err) {
-            console.error("❌ 助けたい人 保存失敗:", err);
-          }
         }}
       >
         {n}
@@ -2409,38 +2608,12 @@ const loadTeamLogs = async () => {
     {/* 🧩 自由追加ボタン */}
     <button
       className="btn"
-      onClick={async () => {
+      onClick={() => {
         const el = document.getElementById("freeTarget");
         const v = String(el.value || "").trim();
         if (!v) return;
         setSelectedTarget(v);
         el.value = "";
-
-        try {
-          // 🟢 userIdを確保
-          let userId = localStorage.getItem("userId");
-          if (!userId) {
-            userId = "U" + Math.random().toString(36).slice(2, 6);
-            localStorage.setItem("userId", userId);
-          }
-
-          await updateTeamState({
-            team: teamName,
-            role,
-            userId, // ✅ 追加
-            topic,
-            target: v,
-            scenario,
-            premise,
-            trouble,
-            otherPrem,
-            cause,
-            idea,
-          });
-          console.log(`💾 助けたい人（自由追加）更新 (${role})`, v);
-        } catch (err) {
-          console.error("❌ 助けたい人（自由追加）保存失敗:", err);
-        }
       }}
     >
       追加
@@ -2512,12 +2685,53 @@ const loadTeamLogs = async () => {
       )}
     </div>
   </div>
+
+  {/* ✅ 明示保存 */}
+  <div style={{ marginTop: 10 }}>
+    <button
+      className="btn"
+      onClick={async () => {
+        try {
+          let userId = localStorage.getItem("userId");
+          if (!userId) {
+            userId = "U" + crypto.randomUUID().slice(0, 8);
+            localStorage.setItem("userId", userId);
+          }
+
+await saveUserState({
+  team: teamName,
+
+  userId: currentUserId,        // ← 保存キー用（必須）
+  author: currentUserName,      // ← 表示名
+
+  topic,
+  target: selectedTarget,
+  scenario,
+  premise,
+  trouble,
+  otherPrem,
+  cause,
+  idea,
+  plans,
+});
+
+
+          console.log("💾 target 個人保存OK", selectedTarget);
+        } catch (err) {
+          console.error("❌ target 個人保存失敗", err);
+        }
+      }}
+    >
+      OK
+    </button>
+  </div>
 </div>
 
 
 
+
 {/* Step 3: シナリオ */}
-<div className="card"id="card3">
+<div className="card" id="card3">
   <h3 style={{ marginBottom: 8 }}>③ シナリオを考えよう</h3>
 
   <div
@@ -2555,7 +2769,7 @@ const loadTeamLogs = async () => {
       {scenarioListening ? "🎙️" : "🎤"}
     </button>
 
-    {/* 原案ボタン・決定ボタン */}
+    {/* 原案・修正切替 */}
     {selectedTarget &&
       (scenarioFixed ? (
         <button className="btn" onClick={() => setScenarioFixed(false)}>
@@ -2563,43 +2777,19 @@ const loadTeamLogs = async () => {
         </button>
       ) : (
         <>
-          <button className="btn" onClick={() => setScenarioDraft(scenario)}>
+          <button
+            className="btn"
+            onClick={() => setScenarioDraft(scenario)}
+          >
             原案に戻す
           </button>
 
-          {/* 🟢 保存付き 決定ボタン */}
+          {/* ✅ 決定（state確定のみ） */}
           <button
             className="btnDark"
-            onClick={async () => {
+            onClick={() => {
               setScenario(scenarioDraft);
               setScenarioFixed(true);
-
-              try {
-                // 🟢 userIdを確保
-                let userId = localStorage.getItem("userId");
-                if (!userId) {
-                  userId = "U" + Math.random().toString(36).slice(2, 6);
-                  localStorage.setItem("userId", userId);
-                }
-
-                await updateTeamState({
-                  team: teamName,
-                  role,
-                  userId, // ✅ 追加
-                  topic,
-                  target: selectedTarget,
-                  scenario: scenarioDraft,
-                  premise,
-                  trouble,
-                  otherPrem,
-                  cause,
-                  idea,
-                });
-
-                console.log(`💾 シナリオ保存OK (${role})`, scenarioDraft);
-              } catch (err) {
-                console.error("❌ シナリオ保存失敗:", err);
-              }
             }}
           >
             決定
@@ -2636,7 +2826,9 @@ const loadTeamLogs = async () => {
       }}
     />
   )}
+
 </div>
+
 
 
 
@@ -2686,37 +2878,7 @@ const loadTeamLogs = async () => {
 
 <textarea
   value={premise}
-  onChange={async (e) => {
-    const newPremise = e.target.value;
-    setPremise(newPremise);
-
-    try {
-      // 🟢 userIdを確保
-      let userId = localStorage.getItem("userId");
-      if (!userId) {
-        userId = "U" + Math.random().toString(36).slice(2, 6);
-        localStorage.setItem("userId", userId);
-      }
-
-      await updateTeamState({
-        team: teamName,
-        role,
-        userId, // ✅ 追加！
-        topic,
-        target: selectedTarget,
-        scenario,
-        premise: newPremise,
-        trouble,
-        otherPrem,
-        cause,
-        idea,
-      });
-
-      console.log(`💾 premise 更新 (${role})`, newPremise);
-    } catch (err) {
-      console.error("❌ premise 保存失敗:", err);
-    }
-  }}
+  onChange={(e) => setPremise(e.target.value)}
   rows={1}
   placeholder="みんなが『当たり前』と思っていることは何かな？"
   style={{
@@ -2727,6 +2889,7 @@ const loadTeamLogs = async () => {
     color: premise ? "#111" : "#9ca3af",
   }}
 />
+
 
 
 {/* === 困っている内容 === */}
@@ -2757,37 +2920,7 @@ const loadTeamLogs = async () => {
 
 <textarea
   value={trouble}
-  onChange={async (e) => {
-    const newTrouble = e.target.value;
-    setTrouble(newTrouble);
-
-    try {
-      // 🟢 userIdを確保（共通ロジック）
-      let userId = localStorage.getItem("userId");
-      if (!userId) {
-        userId = "U" + Math.random().toString(36).slice(2, 6);
-        localStorage.setItem("userId", userId);
-      }
-
-      await updateTeamState({
-        team: teamName,
-        role,
-        userId, // ✅ 追加
-        topic,
-        target: selectedTarget,
-        scenario,
-        premise,
-        trouble: newTrouble,
-        otherPrem,
-        cause,
-        idea,
-      });
-
-      console.log(`💾 trouble 更新 (${role})`, newTrouble);
-    } catch (err) {
-      console.error("❌ trouble 保存失敗:", err);
-    }
-  }}
+  onChange={(e) => setTrouble(e.target.value)}
   rows={1}
   placeholder="どんなことで困っているのかな？"
   style={{
@@ -2798,6 +2931,7 @@ const loadTeamLogs = async () => {
     color: trouble ? "#111" : "#9ca3af",
   }}
 />
+
 
 {/* === 他の前提 === */}
 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
@@ -2827,37 +2961,7 @@ const loadTeamLogs = async () => {
 
 <textarea
   value={otherPrem}
-  onChange={async (e) => {
-    const newOtherPrem = e.target.value;
-    setOtherPrem(newOtherPrem);
-
-    try {
-      // 🟢 userIdを確保（前提や困りごとと同じ仕組み）
-      let userId = localStorage.getItem("userId");
-      if (!userId) {
-        userId = "U" + Math.random().toString(36).slice(2, 6);
-        localStorage.setItem("userId", userId);
-      }
-
-      await updateTeamState({
-        team: teamName,
-        role,
-        userId, // ✅ 追加！
-        topic,
-        target: selectedTarget,
-        scenario,
-        premise,
-        trouble,
-        otherPrem: newOtherPrem,
-        cause,
-        idea,
-      });
-
-      console.log(`💾 otherPrem 更新 (${role})`, newOtherPrem);
-    } catch (err) {
-      console.error("❌ otherPrem 保存失敗:", err);
-    }
-  }}
+  onChange={(e) => setOtherPrem(e.target.value)}
   rows={1}
   placeholder="他にどんな見方があるかな？"
   style={{
@@ -2868,6 +2972,7 @@ const loadTeamLogs = async () => {
     color: otherPrem ? "#111" : "#9ca3af",
   }}
 />
+
 
 
 {/* === 原因 === */}
@@ -2898,37 +3003,7 @@ const loadTeamLogs = async () => {
 
 <textarea
   value={cause}
-  onChange={async (e) => {
-    const newCause = e.target.value;
-    setCause(newCause);
-
-    try {
-      // 🟢 userIdを確保
-      let userId = localStorage.getItem("userId");
-      if (!userId) {
-        userId = "U" + Math.random().toString(36).slice(2, 6);
-        localStorage.setItem("userId", userId);
-      }
-
-      await updateTeamState({
-        team: teamName,
-        role,
-        userId, // ✅ 追加
-        topic,
-        target: selectedTarget,
-        scenario,
-        premise,
-        trouble,
-        otherPrem,
-        cause: newCause,
-        idea,
-      });
-
-      console.log(`💾 cause 更新 (${role})`, newCause);
-    } catch (err) {
-      console.error("❌ cause 保存失敗:", err);
-    }
-  }}
+  onChange={(e) => setCause(e.target.value)}
   rows={1}
   placeholder="どうしてそうなっているのかな？"
   style={{
@@ -2939,6 +3014,7 @@ const loadTeamLogs = async () => {
     color: cause ? "#111" : "#9ca3af",
   }}
 />
+
 
 {/* === アイデア === */}
 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
@@ -2968,37 +3044,7 @@ const loadTeamLogs = async () => {
 
 <textarea
   value={idea}
-  onChange={async (e) => {
-    const newIdea = e.target.value;
-    setIdea(newIdea);
-
-    try {
-      // 🟢 userIdを確保
-      let userId = localStorage.getItem("userId");
-      if (!userId) {
-        userId = "U" + Math.random().toString(36).slice(2, 6);
-        localStorage.setItem("userId", userId);
-      }
-
-      await updateTeamState({
-        team: teamName,
-        role,
-        userId, // ✅ 追加！
-        topic,
-        target: selectedTarget,
-        scenario,
-        premise,
-        trouble,
-        otherPrem,
-        cause,
-        idea: newIdea,
-      });
-
-      console.log(`💾 idea 更新 (${role})`, newIdea);
-    } catch (err) {
-      console.error("❌ idea 保存失敗:", err);
-    }
-  }}
+  onChange={(e) => setIdea(e.target.value)}
   rows={1}
   placeholder="解決のためにできることは？"
   style={{
@@ -3009,6 +3055,8 @@ const loadTeamLogs = async () => {
     color: idea ? "#111" : "#9ca3af",
   }}
 />
+
+
 
 
 {/* === ⑤ 計画と実行 === */}
@@ -3025,31 +3073,12 @@ const loadTeamLogs = async () => {
   {/* ＋ボタン */}
   <button
     className="btn"
-    onClick={async () => {
+    onClick={() => {
       const newPlans = [
         ...plans,
-        { who: "", what: "", how: "", good: "", bad: "" },
+        { who: "", executor: "", what: "", how: "", good: "", bad: "" },
       ];
       setPlans(newPlans);
-
-      try {
-        await updateTeamState({
-          team: teamName,
-          role,
-          topic,
-          target: selectedTarget,
-          scenario,
-          premise,
-          trouble,
-          otherPrem,
-          cause,
-          idea,
-          plans: newPlans,
-        });
-        console.log("💾 プラン追加＆保存:", newPlans.length);
-      } catch (err) {
-        console.error("❌ プラン追加保存失敗:", err);
-      }
     }}
     style={{
       marginLeft: "4px",
@@ -3067,28 +3096,9 @@ const loadTeamLogs = async () => {
   {plans.length > 1 && (
     <button
       className="btn"
-      onClick={async () => {
+      onClick={() => {
         const newPlans = plans.slice(0, -1);
         setPlans(newPlans);
-
-        try {
-          await updateTeamState({
-            team: teamName,
-            role,
-            topic,
-            target: selectedTarget,
-            scenario,
-            premise,
-            trouble,
-            otherPrem,
-            cause,
-            idea,
-            plans: newPlans,
-          });
-          console.log("💾 プラン削除＆保存:", newPlans.length);
-        } catch (err) {
-          console.error("❌ プラン削除保存失敗:", err);
-        }
       }}
       style={{
         marginLeft: 4,
@@ -3127,11 +3137,12 @@ const loadTeamLogs = async () => {
       }}
     >
       <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>({i + 1})</div>
+
       <div style={{ position: "relative" }}>
         <input
           list={`user-options-${i}`}
           placeholder="誰が考えた？"
-          value={plan.who}
+          value={plan.who || ""}
           onChange={(e) =>
             updatePlan(i, { ...plan, who: e.target.value })
           }
@@ -3144,15 +3155,18 @@ const loadTeamLogs = async () => {
           }}
         />
         <datalist id={`user-options-${i}`}>
-          {(userList || []).map((u, idx) => (
-            <option key={idx} value={u} />
+          {(userList || []).map((u) => (
+            <option key={u} value={u} />
           ))}
         </datalist>
       </div>
-      <span style={{ fontSize: "0.9rem", color: "#374151" }}>が考えた対策</span>
+
+      <span style={{ fontSize: "0.9rem", color: "#374151" }}>
+        が考えた対策
+      </span>
     </div>
 
-    {/* === 各入力欄 === */}
+    {/* === 実行内容 === */}
     <div
       style={{
         position: "relative",
@@ -3179,17 +3193,12 @@ const loadTeamLogs = async () => {
           border: "none",
           borderRadius: "8px",
           cursor: "pointer",
-          transition: "all 0.25s ease",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
         }}
         title="音声で入力"
       >
         {listeningPlan ? "🎙️" : "🎤"}
       </button>
 
-      {/* grid3 */}
       <div
         style={{
           display: "grid",
@@ -3207,14 +3216,14 @@ const loadTeamLogs = async () => {
         />
         <input
           placeholder="何を"
-          value={plan.what}
+          value={plan.what || ""}
           onChange={(e) =>
             updatePlan(i, { ...plan, what: e.target.value })
           }
         />
         <input
           placeholder="どうやって"
-          value={plan.how}
+          value={plan.how || ""}
           onChange={(e) =>
             updatePlan(i, { ...plan, how: e.target.value })
           }
@@ -3245,22 +3254,16 @@ const loadTeamLogs = async () => {
           height: "30px",
           background: goodListening ? "#f87171" : "#e5e7eb",
           color: goodListening ? "#fff" : "#111",
-          fontSize: "1.05rem",
           border: "none",
           borderRadius: "8px",
-          cursor: "pointer",
-          transition: "all 0.25s ease",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
         }}
-        title="音声で入力"
       >
         {goodListening ? "🎙️" : "🎤"}
       </button>
+
       <input
         placeholder="良い結果の予想"
-        value={plan.good}
+        value={plan.good || ""}
         onChange={(e) =>
           updatePlan(i, { ...plan, good: e.target.value })
         }
@@ -3297,22 +3300,16 @@ const loadTeamLogs = async () => {
           height: "30px",
           background: badListening ? "#f87171" : "#e5e7eb",
           color: badListening ? "#fff" : "#111",
-          fontSize: "1.05rem",
           border: "none",
           borderRadius: "8px",
-          cursor: "pointer",
-          transition: "all 0.25s ease",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
         }}
-        title="音声で入力"
       >
         {badListening ? "🎙️" : "🎤"}
       </button>
+
       <input
         placeholder="良くない結果の予想"
-        value={plan.bad}
+        value={plan.bad || ""}
         onChange={(e) =>
           updatePlan(i, { ...plan, bad: e.target.value })
         }
@@ -3327,6 +3324,7 @@ const loadTeamLogs = async () => {
     </div>
   </div>
 ))}
+
 
 
 

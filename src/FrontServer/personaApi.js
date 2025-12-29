@@ -1,14 +1,20 @@
+// ==============================
 // 1. API 基本設定
+// ==============================
 const BASE = "https://ms-engine-test.s-yamane.workers.dev";
 if (!BASE) throw new Error("API BASE is missing");
+
 const headers = {
   "Content-Type": "application/json",
   "Cache-Control": "no-store",
 };
+
 const salt = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+// ==============================
 // 2. 共通 POST ヘルパー
+// ==============================
 async function post(path, body = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
@@ -19,7 +25,9 @@ async function post(path, body = {}) {
   return res.json();
 }
 
+// ==============================
 // 3. Persona（AI）関連
+// ==============================
 export const analyzeLine = (text, options = {}) =>
   post("/persona/analyze", { text, ...options });
 
@@ -38,7 +46,9 @@ export const getNoise = (topic, note) =>
 export const getTargets = (topic) =>
   post("/persona/targets", { topic });
 
+// ==============================
 // 4. Board / Evidence
+// ==============================
 export const arrangeBoard = (arg1, spec, notes) => {
   if (Array.isArray(arg1)) {
     return post("/persona/arrangeBoard", { boards: arg1 });
@@ -48,78 +58,70 @@ export const arrangeBoard = (arg1, spec, notes) => {
   }
   return post("/persona/arrangeBoard", { topic: arg1, spec, notes });
 };
+
 export const evidenceQuest = (topic, teamName, notes = []) =>
   post("/persona/evidenceQuest", { topic, teamName, notes });
 
-// 5. TeamState（KV）
-export const getTeamState = async (teamName, userId) => {
-  const teamUrl = `${BASE}/persona/teamState?team=${encodeURIComponent(teamName)}`;
-  const teamRes = await fetch(teamUrl, { headers });
-  if (!teamRes.ok) throw new Error("teamState fetch failed");
-  const teamData = await teamRes.json();
+// ==============================
+// 5. TeamState（チーム共有メタ情報）
+// ==============================
 
-  if (!userId) return teamData;
-
-  const userKey = `${teamName}_user_${userId}`;
-  const userUrl = `${BASE}/persona/teamState?team=${encodeURIComponent(userKey)}`;
-  const userRes = await fetch(userUrl, { headers });
-
-  if (userRes.ok) {
-    const userData = await userRes.json();
-    Object.assign(
-      teamData,
-      Object.fromEntries(
-        Object.entries(userData).filter(([_, v]) => v !== "" && v != null)
-      )
-    );
-  }
-
-  return teamData;
-};
-export const getTeamLogs = async (teamName) => {
+/**
+ * チームの共有情報のみ取得
+ * （参加者・役割など）
+ */
+export const getTeamState = async (teamName) => {
   const res = await fetch(
-    `${BASE}/persona/teamLogs?team=${encodeURIComponent(teamName)}`,
-    { method: "GET", headers }
+    `${BASE}/persona/teamState?team=${encodeURIComponent(teamName)}`,
+    { headers }
   );
-
-  if (!res.ok) {
-    throw new Error(`teamLogs fetch failed: ${res.status}`);
-  }
-
-  return res.json(); // { logs: [...] }
+  if (!res.ok) throw new Error("teamState fetch failed");
+  return res.json(); // { team, users, roles, updatedAt }
 };
 
+/**
+ * チーム共有情報のみ保存
+ * ※ 個人入力は絶対に含めない
 
-export const updateTeamState = async (teamData) => {
-  const { role, team, userId } = teamData;
 
-  if (role === "guide") {
-    console.log("🔒 guide は保存不可");
-    return { skipped: true };
-  }
+// ==============================
+// 6. UserState（個人入力・思考データ）
+// ==============================
 
-  let saveKey = team;
-  if (role === "user" && userId) {
-    saveKey = `${team}_user_${userId}`;
-  }
-
-  const payload = Object.fromEntries(
-    Object.entries({ ...teamData, team: saveKey }).filter(
-      ([_, v]) => v !== undefined
-    )
-  );
-
-  const res = await fetch(`${BASE}/persona/teamState`, {
+/**
+ * 個人入力を保存
+ * team + userId 単位で KV に保存される
+ */
+export const saveUserState = async (payload) => {
+  const res = await fetch(`${BASE}/persona/userState`, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error("teamState save failed");
+  if (!res.ok) throw new Error("userState save failed");
   return res.json();
 };
 
-// 6. Subscription
+// ==============================
+// 7. 個人ログ一覧（LOG画面用）
+// ==============================
+
+/**
+ * チーム内の全 userState を取得
+ */
+export const getTeamUserStates = async (teamName) => {
+  const res = await fetch(
+    `${BASE}/persona/teamUserStates?team=${encodeURIComponent(teamName)}`,
+    { headers }
+  );
+  if (!res.ok) throw new Error("teamUserStates fetch failed");
+  return res.json(); // { users: [...] }
+};
+
+// ==============================
+// 8. Subscription
+// ==============================
 export const subscribePlan = async (user) => {
   const res = await fetch(`${BASE}/persona/subscribe`, {
     method: "POST",
