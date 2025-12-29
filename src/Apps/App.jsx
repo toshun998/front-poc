@@ -1,7 +1,7 @@
 ﻿//React
 import { useEffect, useMemo, useRef, useState } from "react";
 //personaApi
-import {getTargets,explainLineEval as explainLineEvalApi,checkLogBias,getNoise,arrangeBoard,evidenceQuest,getTeamState,updateTeamState,subscribePlan,
+import {getTeamLogs,getTargets,explainLineEval as explainLineEvalApi,checkLogBias,getNoise,arrangeBoard,evidenceQuest,getTeamState,updateTeamState,subscribePlan,
 } from "../FrontServer/personaApi";
 //Styles
 import "./App.css";
