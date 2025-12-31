@@ -1184,7 +1184,7 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
 //ユーザー名定義
 const currentUser = userList?.[0] || "—";
 
-//A! 右上ログ
+//A! 右上個別LOGPDF関数
 function exportLogPdf(payload = {}) {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   pdf.setFont("NotoSansJP-Regular", "normal");
@@ -1271,6 +1271,181 @@ function exportLogPdf(payload = {}) {
   pdf.save(filename);
 }
 
+//A! 全員分LOGPDF関数
+function downloadAllLogsAsCSV(userLogs, teamName) {
+  if (!userLogs || userLogs.length === 0) {
+    alert("ログがありません");
+    return;
+  }
+
+  // ユーザー名一覧
+  const users = userLogs.map(l => l.author || "未記入");
+
+  // 最大計画数を取得
+  const maxPlans = Math.max(
+    ...userLogs.map(l => Array.isArray(l.plans) ? l.plans.length : 0),
+    0
+  );
+
+  const rows = [];
+
+  // === ヘッダー行 ===
+  rows.push(["ユーザー名", ...users]);
+
+  // === 基本項目 ===
+  const baseFields = [
+    ["議題", "topic"],
+    ["ターゲット", "target"],
+    ["シナリオ", "scenario"],
+    ["前提", "premise"],
+    ["困りごと", "trouble"],
+    ["他の前提", "otherPrem"],
+    ["原因", "cause"],
+    ["対策", "idea"],
+  ];
+
+  baseFields.forEach(([label, key]) => {
+    rows.push([
+      label,
+      ...userLogs.map(l => l[key] || "—")
+    ]);
+  });
+
+  // === 計画（横展開）===
+  for (let i = 0; i < maxPlans; i++) {
+    rows.push([
+      `計画${i + 1}_考案者`,
+      ...userLogs.map(l => l.plans?.[i]?.who || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_実行者`,
+      ...userLogs.map(l => l.plans?.[i]?.executor || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_何を`,
+      ...userLogs.map(l => l.plans?.[i]?.what || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_どうやって`,
+      ...userLogs.map(l => l.plans?.[i]?.how || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_良い予想`,
+      ...userLogs.map(l => l.plans?.[i]?.good || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_悪い予想`,
+      ...userLogs.map(l => l.plans?.[i]?.bad || "—")
+    ]);
+  }
+
+  // === CSV生成（BOM付き）===
+  const csvBody = rows
+    .map(r =>
+      r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
+    )
+    .join("\n");
+
+  const bom = "\uFEFF";
+  const blob = new Blob([bom + csvBody], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `logs_${teamName}_matrix.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
+//A! 全員分LOGCSV関数
+function downloadAllLogsAsPDF(userLogs, teamName) {
+  if (!userLogs || userLogs.length === 0) {
+    alert("ログがありません");
+    return;
+  }
+
+  const pdf = new jsPDF({ unit: "mm", format: "a4" });
+  pdf.setFont("NotoSansJP-Regular", "normal");
+
+  let y = 15;
+
+  pdf.setFontSize(16);
+  pdf.text(`個人ログ一覧（${teamName}）`, 15, y);
+  y += 10;
+
+  userLogs.forEach((log, i) => {
+    if (y > 260) {
+      pdf.addPage();
+      y = 15;
+    }
+
+    pdf.setFontSize(13);
+    pdf.text(`■ ${log.author || "未記入"}`, 15, y);
+    y += 6;
+
+    pdf.setFontSize(11);
+
+    const lines = [
+      `議題：${log.topic || "—"}`,
+      `ターゲット：${log.target || "—"}`,
+      `シナリオ：${log.scenario || "—"}`,
+      `前提：${log.premise || "—"}`,
+      `困りごと：${log.trouble || "—"}`,
+      `原因：${log.cause || "—"}`,
+      `対策：${log.idea || "—"}`,
+    ];
+
+    lines.forEach((line) => {
+      if (y > 280) {
+        pdf.addPage();
+        y = 15;
+      }
+      pdf.text(line, 20, y);
+      y += 5;
+    });
+
+    y += 6;
+  });
+
+  pdf.save(`logs_${teamName}.pdf`);
+}
+
+
+
+
+
+
+//A! LOGを見る更新ボタン関数
+async function refreshLogs() {
+  if (isRefreshing) return;
+
+  setIsRefreshing(true);
+  setRefreshDone(false);
+
+  try {
+    const res = await getTeamUserStates(teamName);
+    setUserLogs(res.users || []);
+    
+    // ✔ 表示
+    setRefreshDone(true);
+
+    // ✔ を1秒だけ表示
+    setTimeout(() => {
+      setRefreshDone(false);
+    }, 1000);
+
+  } finally {
+    setIsRefreshing(false);
+  }
+}
+
+
+
+
+
 //A! 右上ログ出力形式定義
 const MARGIN_X = 8;
 const VALUE_X = 20; // ← 中身用（右寄せ）
@@ -1313,6 +1488,16 @@ const [logOpen, setLogOpen] = useState(false);
 const [userLogs, setUserLogs] = useState([]);
 const [selectedUserId, setSelectedUserId] = useState(null);
 const [selectedLog, setSelectedLog] = useState(null);
+const [logSearch, setLogSearch] = useState("");
+const [dlSelectOpen, setDlSelectOpen] = useState(false);
+
+
+//A! LOGを見る更新定義
+const [isRefreshing, setIsRefreshing] = useState(false);
+const [refreshDone, setRefreshDone] = useState(false);
+
+
+
 
 //A! 参加設定定義
 const [currentUserId, setCurrentUserId] = useState(null);
@@ -1357,7 +1542,7 @@ useEffect(() => {
 
 
 
-//A! 2秒後保存エフェクト
+//A! LOGを見る2秒後保存エフェクト
 useEffect(() => {
   const interval = setInterval(() => {
     // 🔒 必須情報が揃うまで保存しない
@@ -1687,9 +1872,6 @@ useEffect(() => {
   LOGを見る
 </button>
 
-
-
-
 {logOpen && (
   <div
     className="gate"
@@ -1697,122 +1879,281 @@ useEffect(() => {
       if (e.target.classList.contains("gate")) {
         setLogOpen(false);
         setSelectedLog(null);
+        setLogSearch("");
       }
     }}
   >
-    <div className="panel" style={{ maxWidth: 800 }}>
-      <h3>個人ログ（{teamName}）</h3>
-
-      {/* 👤 ユーザー一覧 */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
-          marginBottom: 12,
-        }}
-      >
-        {userList.map((name) => (
-          <button
-            key={name}
-            className="btn"
-            style={{
-              background:
-                selectedLog?.author === name
-                  ? "#2563eb"
-                  : "#e5e7eb",
-              color:
-                selectedLog?.author === name
-                  ? "#fff"
-                  : "#111",
-              cursor: "pointer",
-            }}
-            onClick={() => {
-              // ★ 名前に関係なく「表示できるログ」を必ず拾う
-              const hit =
-                userLogs.find((l) => l.author?.includes(name)) ||
-                userLogs[0]; // ← 最後の保険
-
-              setSelectedLog(hit || null);
-            }}
-          >
-            {name}
-          </button>
-        ))}
+    <div
+      className="panel"
+      style={{
+        maxWidth: 800,
+        maxHeight: "80vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* ===== ヘッダー ===== */}
+      <div style={{ marginBottom: 8 }}>
+        <h3 style={{ margin: 0 }}>個人ログ（{teamName}）</h3>
       </div>
 
-      {/* 📄 ログ表示 */}
+      {/* ===== 一覧状態 ===== */}
       {!selectedLog && (
-        <div className="hint">上の名前を選択してください</div>
-      )}
+        <>
+          {/* 🔍 検索 + 更新 + DL */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 10,
+            }}
+          >
+            <input
+              type="text"
+              placeholder="名前で検索"
+              value={logSearch}
+              onChange={(e) => setLogSearch(e.target.value)}
+              style={{
+                flex: 1,
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid #ccc",
+                fontSize: 14,
+              }}
+            />
 
-      {selectedLog && (
-        <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-          <div className="hint" style={{ marginBottom: 6 }}>
-            最終更新：
-            {selectedLog.updatedAt
-              ? new Date(selectedLog.updatedAt).toLocaleString("ja-JP")
-              : "—"}
-          </div>
-
-          <hr />
-
-          <div><b>議題：</b>{selectedLog.topic || "—"}</div>
-          <div><b>ターゲット：</b>{selectedLog.target || "—"}</div>
-          <div><b>シナリオ：</b>{selectedLog.scenario || "—"}</div>
-
-          <hr />
-
-          <div><b>前提</b><br />{selectedLog.premise || "—"}</div>
-          <div><b>困りごと</b><br />{selectedLog.trouble || "—"}</div>
-          <div><b>他の前提</b><br />{selectedLog.otherPrem || "—"}</div>
-          <div><b>原因</b><br />{selectedLog.cause || "—"}</div>
-          <div><b>対策</b><br />{selectedLog.idea || "—"}</div>
-
-          <hr />
-
-          <b>計画</b>
-          {Array.isArray(selectedLog.plans) &&
-          selectedLog.plans.length > 0 ? (
-            selectedLog.plans.map((p, i) => (
-              <div
-                key={`${selectedLog.userId || "log"}-${i}`}
+            {/* 🔄 最新取得 */}
+            <button
+              className="btn"
+              title="最新のログを取得"
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "#f3f4f6",
+                fontSize: 16,
+                opacity: isRefreshing ? 0.6 : 1,
+                pointerEvents: isRefreshing ? "none" : "auto",
+              }}
+              onClick={refreshLogs}
+            >
+              <span
                 style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 6,
-                  padding: 8,
-                  marginTop: 8,
-                  background: "#fafafa",
+                  display: "inline-block",
+                  animation:
+                    isRefreshing && !refreshDone
+                      ? "spin 1s linear infinite"
+                      : "none",
+                  color: refreshDone ? "#16a34a" : "inherit",
                 }}
               >
-                <div><b>考案者：</b>{p.who || "—"}</div>
-                <div><b>実行者：</b>{p.executor || "—"}</div>
-                <div><b>何を：</b>{p.what || "—"}</div>
-                <div><b>どうやって：</b>{p.how || "—"}</div>
-                <div><b>良い予想：</b>{p.good || "—"}</div>
-                <div><b>悪い予想：</b>{p.bad || "—"}</div>
-              </div>
-            ))
+                {refreshDone ? "✔" : "⟳"}
+              </span>
+            </button>
+
+            {/* 📥 全員分DL */}
+            <button
+              className="btn"
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                whiteSpace: "nowrap",
+                padding: "8px 12px",
+              }}
+              onClick={() => setDlSelectOpen(true)}
+            >
+              全員分DL
+            </button>
+          </div>
+
+          {/* 👤 ユーザー一覧 */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {userList
+              .filter((name) => name.includes(logSearch))
+              .map((name) => (
+                <button
+                  key={name}
+                  className="btn"
+                  style={{
+                    background: "#e5e7eb",
+                    color: "#111",
+                    textAlign: "center",
+                  }}
+                  onClick={() => {
+                    const hit =
+                      userLogs.find((l) => l.author === name) || null;
+                    setSelectedLog(
+                      hit ? hit : { author: name, __empty: true }
+                    );
+                  }}
+                >
+                  {name}
+                </button>
+              ))}
+
+            {userList.filter((name) => name.includes(logSearch)).length === 0 && (
+              <div className="hint">該当する名前がありません</div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ===== 詳細表示 ===== */}
+      {selectedLog && (
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            fontSize: 13,
+            lineHeight: 1.7,
+            paddingRight: 6,
+          }}
+        >
+          {/* 👤 誰のログか */}
+          <div
+            style={{
+              fontWeight: "bold",
+              fontSize: 14,
+              marginBottom: 6,
+            }}
+          >
+            {selectedLog.author} のログ
+          </div>
+
+          {selectedLog.__empty ? (
+            <div className="hint">
+              このユーザーのログはまだ作成されていません
+            </div>
           ) : (
-            <div className="hint">計画はありません</div>
+            <>
+              <div className="hint" style={{ marginBottom: 6 }}>
+                最終更新：
+                {selectedLog.updatedAt
+                  ? new Date(selectedLog.updatedAt).toLocaleString("ja-JP")
+                  : "—"}
+              </div>
+
+              <hr />
+
+              <div><b>議題：</b>{selectedLog.topic || "—"}</div>
+              <div><b>ターゲット：</b>{selectedLog.target || "—"}</div>
+              <div><b>シナリオ：</b>{selectedLog.scenario || "—"}</div>
+
+              <hr />
+
+              <div><b>前提</b><br />{selectedLog.premise || "—"}</div>
+              <div><b>困りごと</b><br />{selectedLog.trouble || "—"}</div>
+              <div><b>他の前提</b><br />{selectedLog.otherPrem || "—"}</div>
+              <div><b>原因</b><br />{selectedLog.cause || "—"}</div>
+              <div><b>対策</b><br />{selectedLog.idea || "—"}</div>
+
+              <hr />
+
+              <b>計画</b>
+              {Array.isArray(selectedLog.plans) &&
+              selectedLog.plans.length > 0 ? (
+                selectedLog.plans.map((p, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 6,
+                      padding: 8,
+                      marginTop: 8,
+                      background: "#fafafa",
+                    }}
+                  >
+                    <div><b>考案者：</b>{p.who || "—"}</div>
+                    <div><b>実行者：</b>{p.executor || "—"}</div>
+                    <div><b>何を：</b>{p.what || "—"}</div>
+                    <div><b>どうやって：</b>{p.how || "—"}</div>
+                    <div><b>良い予想：</b>{p.good || "—"}</div>
+                    <div><b>悪い予想：</b>{p.bad || "—"}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="hint">計画はありません</div>
+              )}
+            </>
           )}
         </div>
       )}
 
+      {/* ===== フッター ===== */}
       <div style={{ marginTop: 12, textAlign: "right" }}>
         <button
           className="btn"
           onClick={() => {
-            setLogOpen(false);
-            setSelectedLog(null);
+            if (selectedLog) {
+              setSelectedLog(null);
+            } else {
+              setLogOpen(false);
+              setLogSearch("");
+            }
           }}
         >
-          閉じる
+          {selectedLog ? "戻る" : "閉じる"}
         </button>
       </div>
     </div>
   </div>
 )}
+{dlSelectOpen && (
+  <div
+    className="gate"
+    onClick={(e) => {
+      if (e.target.classList.contains("gate")) {
+        setDlSelectOpen(false);
+      }
+    }}
+  >
+    <div
+      className="panel"
+      style={{
+        maxWidth: 360,
+        padding: 20,
+        textAlign: "center",
+      }}
+    >
+      <h3 style={{ marginBottom: 16 }}>全員分ログを出力</h3>
+
+      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+        <button
+          className="btn"
+          style={{ background: "#16a34a", color: "#fff" }}
+          onClick={() => {
+            downloadAllLogsAsCSV(userLogs, teamName);
+            setDlSelectOpen(false);
+          }}
+        >
+          CSVでDL
+        </button>
+
+        <button
+          className="btn"
+          style={{ background: "#ca1919ff", color: "#fff" }}
+          onClick={() => {
+            downloadAllLogsAsPDF(userLogs, teamName);
+            setDlSelectOpen(false);
+          }}
+        >
+          PDFでDL
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
 
 
 
@@ -1898,127 +2239,146 @@ useEffect(() => {
         if (e.target.classList.contains("gate")) setGateOpen(false);
       }}
     >
-      <div className="panel">
+      <div
+        className="panel"
+        style={{
+          maxHeight: "80vh",          // ★ 画面内に収める
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <h3>参加設定</h3>
 
-        {/* === 役割（※残すが今は使わない） === */}
-        <div className="row">
-          <span className="hint" style={{ width: 90 }}>役割</span>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="guide">先生</option>
-            <option value="leader">班長</option>
-            <option value="user">発言者</option>
-          </select>
-        </div>
+        {/* ===== ここからスクロール領域 ===== */}
+        <div
+          style={{
+            flex: 1,                 // ★ 残り高さを使う
+            overflowY: "auto",       // ★ 中だけスクロール
+            paddingRight: 6,
+          }}
+        >
+          {/* === 役割 === */}
+          <div className="row">
+            <span className="hint" style={{ width: 90 }}>役割</span>
+            <select value={role} onChange={(e) => setRole(e.target.value)}>
+              <option value="guide">先生</option>
+              <option value="leader">班長</option>
+              <option value="user">発言者</option>
+            </select>
+          </div>
 
-        {/* === チーム名 === */}
-        <div className="row">
-          <span className="hint" style={{ width: 90 }}>チーム名</span>
-          <input
-            value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-            placeholder="例：T1 / 1組 / A班"
-          />
-        </div>
+          {/* === チーム名 === */}
+          <div className="row">
+            <span className="hint" style={{ width: 90 }}>チーム名</span>
+            <input
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              placeholder="例：T1 / 1組 / A班"
+            />
+          </div>
 
-        {/* === ユーザー名一覧 === */}
-        <div className="row" style={{ alignItems: "flex-start" }}>
-          <span className="hint" style={{ width: 90 }}>ユーザー名</span>
+          {/* === ユーザー名一覧 === */}
+          <div className="row" style={{ alignItems: "flex-start" }}>
+            <span className="hint" style={{ width: 90 }}>ユーザー名</span>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            {userList.map((u, i) => (
-              <div
-                key={i}
-                style={{ display: "flex", gap: 6, alignItems: "center" }}
-              >
-                <input
-                  value={u}
-                  onChange={(e) => {
-                    const list = [...userList];
-                    list[i] = e.target.value;
-                    setUserList(list);
-                  }}
-                  placeholder={`名前${i + 1}`}
-                  style={{ flex: 1 }}
-                />
-
-                {/* 👤 この人で入る（個人ページを開く） */}
-<button
-  className="btnDark"
-onClick={() => {
-  if (!u.trim()) {
-    alert("名前を入力してください");
-    return;
-  }
-
-  const uid = u; // ★ここが最重要
-
-  localStorage.setItem("currentUserName", u);
-  localStorage.setItem("currentUserId", uid);
-  localStorage.setItem("teamName", teamName);
-
-  const url =
-    `${window.location.origin}` +
-    `/?team=${encodeURIComponent(teamName)}` +
-    `&user=${encodeURIComponent(uid)}`;
-
-  window.open(url, "_blank");
-  setGateOpen(false);
-}}
-
->
-  入る
-</button>
-
-
-
-
-                {/* 追加 / 削除 */}
-                {i === 0 ? (
-                  <button
-                    className="btn"
-                    onClick={() => setUserList([...userList, ""])}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      fontSize: "1rem",
-                      borderRadius: 8,
-                      background: "#e5e7eb",
-                      color: "#2563eb",
-                    }}
-                  >
-                    ＋
-                  </button>
-                ) : (
-                  <button
-                    className="btn"
-                    onClick={() => {
-                      const list = userList.filter((_, idx) => idx !== i);
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                flex: 1,
+              }}
+            >
+              {userList.map((u, i) => (
+                <div
+                  key={i}
+                  style={{ display: "flex", gap: 6, alignItems: "center" }}
+                >
+                  <input
+                    value={u}
+                    onChange={(e) => {
+                      const list = [...userList];
+                      list[i] = e.target.value;
                       setUserList(list);
                     }}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      fontSize: "1rem",
-                      borderRadius: 8,
-                      border: "1.5px solid #b91c1c",
-                      background: "#fee2e2",
-                      color: "#b91c1c",
+                    placeholder={`名前${i + 1}`}
+                    style={{ flex: 1 }}
+                  />
+
+                  {/* 👤 この人で入る */}
+                  <button
+                    className="btnDark"
+                    onClick={() => {
+                      if (!u.trim()) {
+                        alert("名前を入力してください");
+                        return;
+                      }
+
+                      const uid = u;
+                      localStorage.setItem("currentUserName", u);
+                      localStorage.setItem("currentUserId", uid);
+                      localStorage.setItem("teamName", teamName);
+
+                      const url =
+                        `${window.location.origin}` +
+                        `/?team=${encodeURIComponent(teamName)}` +
+                        `&user=${encodeURIComponent(uid)}`;
+
+                      window.open(url, "_blank");
+                      setGateOpen(false);
                     }}
                   >
-                    −
+                    入る
                   </button>
-                )}
-              </div>
-            ))}
+
+                  {/* 追加 / 削除 */}
+                  {i === 0 ? (
+                    <button
+                      className="btn"
+                      onClick={() => setUserList([...userList, ""])}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        fontSize: "1rem",
+                        borderRadius: 8,
+                        background: "#e5e7eb",
+                        color: "#2563eb",
+                      }}
+                    >
+                      ＋
+                    </button>
+                  ) : (
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        const list = userList.filter((_, idx) => idx !== i);
+                        setUserList(list);
+                      }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        fontSize: "1rem",
+                        borderRadius: 8,
+                        border: "1.5px solid #b91c1c",
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                      }}
+                    >
+                      −
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+        {/* ===== スクロール領域ここまで ===== */}
 
-        {/* === 名簿保存だけする === */}
+        {/* === 名簿保存 === */}
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button
             className="btn"
-            style={{ marginTop: 20 }}
+            style={{ marginTop: 12 }}
             onClick={() => {
               const cleaned = userList.map((u) => u.trim());
               setUserList(cleaned);
@@ -2031,7 +2391,6 @@ onClick={() => {
             名簿を保存
           </button>
         </div>
-
       </div>
     </div>
   )
