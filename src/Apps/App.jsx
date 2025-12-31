@@ -43,7 +43,7 @@ const [view, setView] = useState("INTRO");
 const [stage, setStage] = useState("intro");
   //Kv保存定義
 const [topic,setTopic] = useState("");
-const [role,setRole] = useState(()=>localStorage.getItem("role")||"user");
+
 const [teamName,setTeamName] = useState(()=>localStorage.getItem("teamName")||"T1");
 //LoadingUI定義
 const [gateLoading, setGateLoading] = useState(false);
@@ -201,7 +201,7 @@ async function updatePlan(index, newPlan) {
 }
 
 
-  useEffect(()=>{localStorage.setItem("role",role);},[role]);
+
   useEffect(()=>{localStorage.setItem("teamName",teamName);},[teamName]);
   const [portrait, setPortrait] = useState(() => window.innerHeight > window.innerWidth);
     useEffect(() => {
@@ -1199,7 +1199,7 @@ function exportLogPdf(payload = {}) {
   // 基本情報
   writeLine(pdf, "【基本情報】", yRef, 12);
   writeLine(pdf, `チーム：${meta.team ?? "—"}`, yRef, 11, VALUE_X);
-  writeLine(pdf, `役割：${meta.role ?? "—"}`, yRef, 11, VALUE_X);
+
   writeLine(pdf, `ユーザー：${meta.user ?? "—"}`, yRef, 11, VALUE_X);
   writeLine(pdf, `日時：${meta.date ?? "—"}`, yRef, 11, VALUE_X);
   yRef.y += 3;
@@ -1465,7 +1465,7 @@ const writeLine = (pdf, text, yRef, size = 11, x = MARGIN_X) => {
 const logPayload = {
   meta: {
     team: teamName,
-    role,
+
     user: currentUser, 
     date: new Date().toLocaleString("ja-JP"),
   },
@@ -1519,7 +1519,7 @@ useEffect(() => {
   localStorage.setItem("teamName", team);
   localStorage.setItem("currentUserId", userId);
   localStorage.setItem("currentUserName", userId);
-  localStorage.setItem("role", "user");
+
 
   console.log("👤 個人ページ初期化:", { team, userId });
 
@@ -2123,9 +2123,18 @@ useEffect(() => {
         textAlign: "center",
       }}
     >
-      <h3 style={{ marginBottom: 16 }}>全員分ログを出力</h3>
+      <h3 style={{ marginBottom: 16 }}>
+        どちらの形式で出力しますか？
+      </h3>
 
-      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          justifyContent: "center",
+          marginBottom: 16,
+        }}
+      >
         <button
           className="btn"
           style={{ background: "#16a34a", color: "#fff" }}
@@ -2148,9 +2157,20 @@ useEffect(() => {
           PDFでDL
         </button>
       </div>
+
+      {/* 🔽 閉じるボタン */}
+      <div style={{ textAlign: "right" }}>
+        <button
+          className="btn"
+          onClick={() => setDlSelectOpen(false)}
+        >
+          閉じる
+        </button>
+      </div>
     </div>
   </div>
 )}
+
 
 
 
@@ -2257,15 +2277,7 @@ useEffect(() => {
             paddingRight: 6,
           }}
         >
-          {/* === 役割 === */}
-          <div className="row">
-            <span className="hint" style={{ width: 90 }}>役割</span>
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="guide">先生</option>
-              <option value="leader">班長</option>
-              <option value="user">発言者</option>
-            </select>
-          </div>
+
 
           {/* === チーム名 === */}
           <div className="row">
@@ -2384,7 +2396,7 @@ useEffect(() => {
               setUserList(cleaned);
               localStorage.setItem("userList", JSON.stringify(cleaned));
               localStorage.setItem("teamName", teamName);
-              localStorage.setItem("role", role);
+
               setGateOpen(false);
             }}
           >
@@ -2433,33 +2445,21 @@ useEffect(() => {
               setEvidenceHints({});
               setEvidenceOpen(true);
               setLoading(true);
-            
+
               try {
                 const res = await evidenceQuest(topic, teamName, visibleNotes);
-            
-                console.log("🧩 現在の役割:", role);
+
                 console.log("📦 AI返却:", res);
-            
-                let filtered = res;
-            
-                // 🎓 ユーザーまたはリーダーの場合は result から2件だけ抽出
-                if (role === "user" || role === "leader") {
-                  const entries = Object.entries(res.result || {});
-                  const shuffled = entries.sort(() => Math.random() - 0.5);
-                  const picked = shuffled.slice(0, 2);
-                  filtered = { ...res, result: Object.fromEntries(picked) };
-                }
-            
-                // 🎯 setEvidenceHints に格納
-                setEvidenceHints(filtered);
+
+                // 🎯 そのまま setEvidenceHints に格納
+                setEvidenceHints(res);
               } catch (e) {
                 console.error(e);
                 setEvidenceHints({ error: "エラーが発生しました。" });
               }
-            
+
               setLoading(false);
             }}
-            
           >
             Evidence Quest
           </button>
@@ -2523,6 +2523,9 @@ useEffect(() => {
     </div>
   </div>
 )}
+
+
+
 {/* エビデンスクエストモーダル */}
 {evidenceOpen && (
   <div
@@ -2584,17 +2587,10 @@ useEffect(() => {
         </div>
       ) : evidenceHints && Object.keys(evidenceHints).length > 0 ? (
         (() => {
-          // === 余計なresultを除外 ===
-          const entries = Object.entries(evidenceHints).filter(([key]) => key !== "result");
-
-          // === roleに応じた表示制御 ===
-          let displayEntries = entries;
-          if (role === "leader" || role === "user") {
-            // ランダムで2つだけ表示
-            displayEntries = [...entries]
-              .sort(() => Math.random() - 0.5)
-              .slice(0, 2);
-          }
+          // === result を除外 ===
+          const displayEntries = Object.entries(evidenceHints).filter(
+            ([key]) => key !== "result"
+          );
 
           return (
             <div
@@ -2645,11 +2641,15 @@ useEffect(() => {
           );
         })()
       ) : (
-        <p style={{ textAlign: "center", margin: "14px 0" }}>ヒントがありません。</p>
+        <p style={{ textAlign: "center", margin: "14px 0" }}>
+          ヒントがありません。
+        </p>
       )}
     </div>
   </div>
 )}
+
+
 {/* 盲点モーダル */}
 {noiseOpen && (
   <div
