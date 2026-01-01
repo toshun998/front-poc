@@ -1184,6 +1184,8 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
 //ユーザー名定義
 const currentUser = userList?.[0] || "—";
 
+// 参加設定モーダルで入力したやつ
+
 //A! 右上個別LOGPDF関数
 function exportLogPdf(payload = {}) {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
@@ -1461,12 +1463,19 @@ const writeLine = (pdf, text, yRef, size = 11, x = MARGIN_X) => {
   pdf.text([String(text ?? "")], x, yRef.y);
   yRef.y += size + 1;
 };
+
+
+// 参加設定モーダルで入力した名前
+
+const displayName =
+  localStorage.getItem("currentUserName") || "—";
+
 //A! 右上ログ定義
 const logPayload = {
   meta: {
     team: teamName,
 
-    user: currentUser, 
+    user: displayName,   // ← ★ここを必ず表示名に
     date: new Date().toLocaleString("ja-JP"),
   },
 
@@ -1482,6 +1491,7 @@ const logPayload = {
     plans,
   },
 };
+
 
 //A! LOGを見る定義
 const [logOpen, setLogOpen] = useState(false);
