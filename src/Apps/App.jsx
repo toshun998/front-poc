@@ -32,6 +32,50 @@ import { jsPDF } from "jspdf";
 import "../Assets/NotoSansJP-Regular-normal";
 
 
+
+//A! 背景絵文字
+export function BrainShower() {
+  const containerRef = useRef(null);
+  const icons = ["🧠", "💡", "💭", "📘", "🎨", "🔎", "❓", "❗️", "👊"];
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // 🧠 定期的に新しいアイコンを生成して落とす
+    const createBrain = () => {
+      const span = document.createElement("span");
+      const icon = icons[Math.floor(Math.random() * icons.length)];
+      const hue = Math.floor(Math.random() * 360);
+
+      span.textContent = icon;
+      span.style.position = "absolute";
+      span.style.left = `${Math.random() * 100}%`;
+      span.style.top = "-10%";
+      span.style.fontSize = `${18 + Math.random() * 24}px`;
+      span.style.opacity = 0.6 + Math.random() * 0.4;
+      span.style.filter = `drop-shadow(0 0 3px hsl(${hue}, 80%, 70%))`;
+      span.style.animation = `fallBrain ${8 + Math.random() * 8}s linear`;
+      span.style.transform = `rotate(${Math.random() * 360}deg)`;
+      span.style.pointerEvents = "none";
+
+      // 💫 アニメーション終了後に削除
+      span.addEventListener("animationend", () => span.remove());
+
+      container.appendChild(span);
+    };
+
+    // 🌧 継続して降らせる（0.3秒ごと）
+    intervalRef.current = setInterval(createBrain, 300);
+
+    return () => {
+      clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  return <div ref={containerRef} className="brain-shower" />;
+}
 /* ========== App ========== */
 export default function App(){
 //2秒ごと保存定義
@@ -285,49 +329,7 @@ const sendLogin = async () => {
     alert("通信エラー");
   }
 };
-//A! 背景絵文字
-function BrainShower() {
-  const containerRef = useRef(null);
-  const icons = ["🧠", "💡", "💭", "📘", "🎨", "🔎", "❓", "❗️", "👊"];
-  const intervalRef = useRef(null);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // 🧠 定期的に新しいアイコンを生成して落とす
-    const createBrain = () => {
-      const span = document.createElement("span");
-      const icon = icons[Math.floor(Math.random() * icons.length)];
-      const hue = Math.floor(Math.random() * 360);
-
-      span.textContent = icon;
-      span.style.position = "absolute";
-      span.style.left = `${Math.random() * 100}%`;
-      span.style.top = "-10%";
-      span.style.fontSize = `${18 + Math.random() * 24}px`;
-      span.style.opacity = 0.6 + Math.random() * 0.4;
-      span.style.filter = `drop-shadow(0 0 3px hsl(${hue}, 80%, 70%))`;
-      span.style.animation = `fallBrain ${8 + Math.random() * 8}s linear`;
-      span.style.transform = `rotate(${Math.random() * 360}deg)`;
-      span.style.pointerEvents = "none";
-
-      // 💫 アニメーション終了後に削除
-      span.addEventListener("animationend", () => span.remove());
-
-      container.appendChild(span);
-    };
-
-    // 🌧 継続して降らせる（0.3秒ごと）
-    intervalRef.current = setInterval(createBrain, 300);
-
-    return () => {
-      clearInterval(intervalRef.current);
-    };
-  }, []);
-
-  return <div ref={containerRef} className="brain-shower" />;
-}
 //A! 右上サブスク関数
 function SubscribeButton({ user }) {
   const [loading, setLoading] = useState(false);
@@ -1183,7 +1185,6 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
 
 //ユーザー名定義
 const currentUser = userList?.[0] || "—";
-
 // 参加設定モーダルで入力したやつ
 
 //A! 右上個別LOGPDF関数
@@ -1463,19 +1464,14 @@ const writeLine = (pdf, text, yRef, size = 11, x = MARGIN_X) => {
   pdf.text([String(text ?? "")], x, yRef.y);
   yRef.y += size + 1;
 };
-
-
-// 参加設定モーダルで入力した名前
-
+//A! 右上ログ定義
 const displayName =
   localStorage.getItem("currentUserName") || "—";
 
-//A! 右上ログ定義
 const logPayload = {
   meta: {
     team: teamName,
-
-    user: displayName,   // ← ★ここを必ず表示名に
+    user: displayName,   // ← ★ここが正解
     date: new Date().toLocaleString("ja-JP"),
   },
 
