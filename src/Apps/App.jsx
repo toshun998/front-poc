@@ -204,45 +204,6 @@ const { listening: badListening, startListening: startBadListening } =
   });
   
 
-// KV保存送信（userState 専用）
-async function updatePlan(index, newPlan) {
-  setPlans((prev) => {
-    const updated = prev.map((p, i) => (i === index ? newPlan : p));
-
-    // 🔽 非同期保存（userState）
-    (async () => {
-      try {
-        // userId は人格なので一度決めたら固定
-        let userId = localStorage.getItem("userId");
-        if (!userId) {
-          userId = "U" + crypto.randomUUID().slice(0, 8);
-          localStorage.setItem("userId", userId);
-        }
-
-        await saveUserState({
-          team: teamName,
-          author: userId, // 表示用（LOG用）
-
-          topic,
-          target: selectedTarget,
-          scenario,
-          premise,
-          trouble,
-          otherPrem,
-          cause,
-          idea,
-          plans: updated,
-        });
-
-        console.log(`💾 プラン${index + 1} 個人保存OK`, updated[index]);
-      } catch (err) {
-        console.error(`❌ プラン${index + 1} 個人保存失敗`, err);
-      }
-    })();
-
-    return updated;
-  });
-}
 
 
 
@@ -1091,75 +1052,126 @@ const [evidenceOpen, setEvidenceOpen] = useState(false);
 
 
  //A! 送信ボタン
-  const [sending,setSending] = useState(false);
-  async function send() {
-    const any = [premise, trouble, otherPrem, cause, idea, who, what, how, good, bad, ...plans.flatMap(p => Object.values(p))]
-      .some(v => String(v || "").trim());
-    if (!any) {
-      alert("どれか1つでいいので入力してください");
-      return;
-    }
-    if (sending) return;
-    setSending(true);
-  
-    try {
-      const signature = (idea || cause || premise || trouble || otherPrem || "").trim();
-      if (signature) histRef.current.push(signature);
-      const h = histRef.current;
-      if (h.length >= 3) {
-        const s1 = jaccard(h[h.length - 1], h[h.length - 2]);
-        const s2 = jaccard(h[h.length - 2], h[h.length - 3]);
-        if (s1 > 0.75 && s2 > 0.75) {
-          alert("これは外れ値だが：同じ調子が続いています。視点を1つ足して条件を変えてみよう。");
-        }
-      }
-      const fields = { premise, trouble, otherPrem, cause, idea };
-      const flagsDetail = {};
-      let allFlags = [];
-      try {
-        const r = await checkLogBias(topic, fields);
-        for (const [key, obj] of Object.entries(r.results || {})) {
-          flagsDetail[key] = obj.flags || [];
-          flagsDetail[`${key}_advice`] = obj.advice || "";
-          allFlags = allFlags.concat(obj.flags || []);
-        }
-      } catch (e) {
-        console.error("checkLogBias error:", e);
-      }
-  
-      //B!D ノート生成→すべてに統一？
-      const note = {
-        id: crypto.randomUUID(),
-        team: teamName,
-        q: topic || "（無題）",
-        stakeholder: selectedTarget || "（未選択）",
-        scenario: scenarioFixed ? scenario : "(未決定)",
-        premise,
-        trouble,
-        otherPrem,
-        cause,
-        idea,
-        who,
-        what,
-        how,
-        good,
-        bad,
-        plans, 
-        createdAt: new Date().toISOString(),
-        author: currentUser,
-        flagsDetail,
-        allFlags,
-        a: idea || cause || premise || "(入力あり)",
-      };
-      setNotes((n) => [note, ...n]);
-      setView("LOG");
-    } catch (err) {
-      console.error("send error:", err);
-      alert("送信中にエラーが発生しました");
-    } finally {
-      setSending(false);
-    }
+const [sending, setSending] = useState(false);
+
+async function send() {
+  const any = [
+    premise,
+    trouble,
+    otherPrem,
+    cause,
+    idea,
+    who,
+    what,
+    how,
+    good,
+    bad,
+    ...plans.flatMap(p => Object.values(p)),
+  ].some(v => String(v || "").trim());
+
+  if (!any) {
+    alert("どれか1つでいいので入力してください");
+    return;
   }
+
+  if (sending) return;
+  setSending(true);
+
+  try {
+    // --- 思考の連続性チェック ---
+    const signature = (idea || cause || premise || trouble || otherPrem || "").trim();
+    if (signature) histRef.current.push(signature);
+
+    const h = histRef.current;
+    if (h.length >= 3) {
+      const s1 = jaccard(h[h.length - 1], h[h.length - 2]);
+      const s2 = jaccard(h[h.length - 2], h[h.length - 3]);
+      if (s1 > 0.75 && s2 > 0.75) {
+        alert("これは外れ値だが：同じ調子が続いています。視点を1つ足して条件を変えてみよう。");
+      }
+    }
+
+    // --- バイアス解析 ---
+    const fields = { premise, trouble, otherPrem, cause, idea };
+    const flagsDetail = {};
+    let allFlags = [];
+
+    try {
+      const r = await checkLogBias(topic, fields);
+      for (const [key, obj] of Object.entries(r.results || {})) {
+        flagsDetail[key] = obj.flags || [];
+        flagsDetail[`${key}_advice`] = obj.advice || "";
+        allFlags = allFlags.concat(obj.flags || []);
+      }
+    } catch (e) {
+      console.error("checkLogBias error:", e);
+    }
+
+    // --- ノート生成（UI用） ---
+    const note = {
+      id: crypto.randomUUID(),
+      team: teamName,
+      q: topic || "（無題）",
+      stakeholder: selectedTarget || "（未選択）",
+      scenario: scenarioFixed ? scenario : "(未決定)",
+      premise,
+      trouble,
+      otherPrem,
+      cause,
+      idea,
+      who,
+      what,
+      how,
+      good,
+      bad,
+      plans,
+      createdAt: new Date().toISOString(),
+      author: currentUser,
+      flagsDetail,
+      allFlags,
+      a: idea || cause || premise || "(入力あり)",
+    };
+
+    // --- 🔐 KV保存（送信時に1回だけ） ---
+    await saveUserState({
+      team: teamName,
+      userId: currentUserId,
+      author: currentUser,
+
+      topic,
+      target: selectedTarget,
+      scenario: scenarioFixed ? scenario : null,
+
+      premise,
+      trouble,
+      otherPrem,
+      cause,
+      idea,
+      who,
+      what,
+      how,
+      good,
+      bad,
+      plans,
+
+      flagsDetail,
+      allFlags,
+
+      submittedAt: note.createdAt,
+    });
+
+    // --- UI更新 ---
+    setNotes((n) => [note, ...n]);
+    setView("LOG");
+
+  } catch (err) {
+    console.error("send error:", err);
+    alert("送信中にエラーが発生しました");
+  } finally {
+    setSending(false);
+  }
+}
+
 
 //ユーザー名定義
 const currentUser = userList?.[0] || "—";
@@ -1526,64 +1538,11 @@ useEffect(() => {
 
 
 
-//A! LOGを見る2秒後保存エフェクト
-useEffect(() => {
-  const interval = setInterval(() => {
-    // 🔒 必須情報が揃うまで保存しない
-    if (!teamName || !currentUserId || !currentUserName) return;
-
-    const snapshot = JSON.stringify({
-      topic,
-      selectedTarget,
-      scenario,
-      premise,
-      trouble,
-      otherPrem,
-      cause,
-      idea,
-      plans,
-    });
-
-    if (snapshot === lastSavedRef.current) return;
-
-    console.log("⏱ autosave");
-
-    saveUserState({
-      team: teamName,
-      userId: currentUserId,
-      author: currentUserName,
-      topic,
-      target: selectedTarget,
-      scenario,
-      premise,
-      trouble,
-      otherPrem,
-      cause,
-      idea,
-      plans,
-    });
-
-    lastSavedRef.current = snapshot;
-  }, 2000);
-
-  return () => clearInterval(interval);
-}, [
-  teamName,
-  currentUserId,
-  currentUserName,
-  topic,
-  selectedTarget,
-  scenario,
-  premise,
-  trouble,
-  otherPrem,
-  cause,
-  idea,
-  plans,
-]);
 
 
-  /*UI関連*/
+
+
+  //UI関連
   return (
     <>
 {/* INTRO + HOME 表紙 */}
@@ -2222,8 +2181,6 @@ useEffect(() => {
   </>
 )}
 
-
-
 {/* 参加設定モーダル */}
 {gateOpen && (
   gateLoading ? (
@@ -2392,8 +2349,6 @@ useEffect(() => {
   )
 )}
 
-
-
 {/* 終結モーダル */}
 {finalOpen && (
   <div
@@ -2507,8 +2462,6 @@ useEffect(() => {
     </div>
   </div>
 )}
-
-
 
 {/* エビデンスクエストモーダル */}
 {evidenceOpen && (
@@ -2632,7 +2585,6 @@ useEffect(() => {
     </div>
   </div>
 )}
-
 
 {/* 盲点モーダル */}
 {noiseOpen && (
@@ -2854,43 +2806,6 @@ useEffect(() => {
       {listening ? "🎙️" : "🎤"}
     </button>
 
-    {/* ✅ 明示保存 */}
-    <button
-      className="btn"
-      style={{ height: "32px" }}
-      onClick={async () => {
-        try {
-          let userId = localStorage.getItem("userId");
-          if (!userId) {
-            userId = "U" + crypto.randomUUID().slice(0, 8);
-            localStorage.setItem("userId", userId);
-          }
-await saveUserState({
-  team: teamName,
-
-  userId: currentUserId,        // ← 保存キー用（必須）
-  author: currentUserName,      // ← 表示名
-
-  topic,
-  target: selectedTarget,
-  scenario,
-  premise,
-  trouble,
-  otherPrem,
-  cause,
-  idea,
-  plans,
-});
-
-
-          console.log("💾 topic 個人保存OK", topic);
-        } catch (err) {
-          console.error("❌ topic 個人保存失敗", err);
-        }
-      }}
-    >
-      OK
-    </button>
   </div>
 </div>
 
@@ -3029,45 +2944,6 @@ await saveUserState({
     </div>
   </div>
 
-  {/* ✅ 明示保存 */}
-  <div style={{ marginTop: 10 }}>
-    <button
-      className="btn"
-      onClick={async () => {
-        try {
-          let userId = localStorage.getItem("userId");
-          if (!userId) {
-            userId = "U" + crypto.randomUUID().slice(0, 8);
-            localStorage.setItem("userId", userId);
-          }
-
-await saveUserState({
-  team: teamName,
-
-  userId: currentUserId,        // ← 保存キー用（必須）
-  author: currentUserName,      // ← 表示名
-
-  topic,
-  target: selectedTarget,
-  scenario,
-  premise,
-  trouble,
-  otherPrem,
-  cause,
-  idea,
-  plans,
-});
-
-
-          console.log("💾 target 個人保存OK", selectedTarget);
-        } catch (err) {
-          console.error("❌ target 個人保存失敗", err);
-        }
-      }}
-    >
-      OK
-    </button>
-  </div>
 </div>
 
 
@@ -3727,6 +3603,7 @@ await saveUserState({
     </section>
   </main>
 )}
+
 {/* LOG */}
 {view === "LOG" && (
   <main
@@ -3971,6 +3848,7 @@ await saveUserState({
     </section>
   </main>
 )}
+
 {/* === Board === */}
 {view === "BOARD" && (
   <main className="containerWide" style={{ paddingBottom: 32, position: "relative" }}>
