@@ -17,8 +17,7 @@ import {
   // チーム情報（参照のみ）
   getTeamState,
 
-  // 課金
-  subscribePlan,
+
 } from "../FrontServer/personaApi";
 
 //Styles
@@ -193,15 +192,7 @@ const { listening: badListening, startListening: startBadListening } =
   const [plans, setPlans] = useState([
     { who: "", what: "", how: "", good: "", bad: "" },
   ]);
-//設定内容のユーザー定義
-  const [userList, setUserList] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("userList"));
-      return Array.isArray(saved) && saved.length > 0 ? saved : [""];
-    } catch {
-      return [""];
-    }
-  });
+
   
 
 
@@ -268,28 +259,6 @@ useEffect(() => {
 
 
 
-
-//A! 右上サブスク関数
-function SubscribeButton({ user }) {
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubscribe() {
-    setLoading(true);
-    try {
-      await subscribePlan(user);
-    } catch (err) {
-      alert("通信エラー: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <button className="btnDark" onClick={handleSubscribe} disabled={loading}>
-      {loading ? "接続中..." : "🪙サブスク"}
-    </button>
-  );
-}
 
 
 //A! 難易度関連
@@ -1051,9 +1020,8 @@ const [evidenceHints, setEvidenceHints] = useState([]);
 const [evidenceOpen, setEvidenceOpen] = useState(false);
 
 
- //A! 送信ボタン
+ //A! 送信ボタン/KVホゾン
 const [sending, setSending] = useState(false);
-
 async function send() {
   const any = [
     premise,
@@ -1171,6 +1139,68 @@ async function send() {
     setSending(false);
   }
 }
+
+
+
+// 参加設定のユーザー定義（仮除籍対応）
+const [userList, setUserList] = useState(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem("userList"));
+
+    // 旧形式（string[]）→ 新形式に正規化
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved.map((u) =>
+        typeof u === "string"
+          ? { name: u, removed: false }
+          : { name: u.name || "", removed: !!u.removed }
+      );
+    }
+
+    return [{ name: "", removed: false }];
+  } catch {
+    return [{ name: "", removed: false }];
+  }
+});
+
+//A! 参加設定定義
+const [currentUserId, setCurrentUserId] = useState(null);
+const [currentUserName, setCurrentUserName] = useState(null);
+
+//A! 参加設定エフェクト
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const team = params.get("team");
+  const userId = params.get("user"); // ★ team を含まない
+
+  if (!team || !userId) return;
+
+  setTeamName(team);
+  setCurrentUserId(userId);
+  setCurrentUserName(userId);
+
+  localStorage.setItem("teamName", team);
+  localStorage.setItem("currentUserId", userId);
+  localStorage.setItem("currentUserName", userId);
+
+
+  console.log("👤 個人ページ初期化:", { team, userId });
+
+  (async () => {
+    const res = await getTeamUserStates(team);
+    const my = res.users.find((u) => u.userId === userId);
+    if (!my) return;
+
+    setTopic(my.topic || "");
+    setSelectedTarget(my.target || "");
+    setScenario(my.scenario || "");
+    setPremise(my.premise || "");
+    setTrouble(my.trouble || "");
+    setOtherPrem(my.otherPrem || "");
+    setCause(my.cause || "");
+    setIdea(my.idea || "");
+    setPlans(Array.isArray(my.plans) ? my.plans : []);
+  })();
+}, []);
 
 
 //ユーザー名定義
@@ -1495,48 +1525,6 @@ const [refreshDone, setRefreshDone] = useState(false);
 
 
 
-//A! 参加設定定義
-const [currentUserId, setCurrentUserId] = useState(null);
-const [currentUserName, setCurrentUserName] = useState(null);
-
-
-//A! 参加設定エフェクト
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const team = params.get("team");
-  const userId = params.get("user"); // ★ team を含まない
-
-  if (!team || !userId) return;
-
-  setTeamName(team);
-  setCurrentUserId(userId);
-  setCurrentUserName(userId);
-
-  localStorage.setItem("teamName", team);
-  localStorage.setItem("currentUserId", userId);
-  localStorage.setItem("currentUserName", userId);
-
-
-  console.log("👤 個人ページ初期化:", { team, userId });
-
-  (async () => {
-    const res = await getTeamUserStates(team);
-    const my = res.users.find((u) => u.userId === userId);
-    if (!my) return;
-
-    setTopic(my.topic || "");
-    setSelectedTarget(my.target || "");
-    setScenario(my.scenario || "");
-    setPremise(my.premise || "");
-    setTrouble(my.trouble || "");
-    setOtherPrem(my.otherPrem || "");
-    setCause(my.cause || "");
-    setIdea(my.idea || "");
-    setPlans(Array.isArray(my.plans) ? my.plans : []);
-  })();
-}, []);
-
-
 
 
 
@@ -1652,109 +1640,12 @@ useEffect(() => {
 </button>
 
 
-    {/* 🪙 サブスク */}
-<SubscribeButton user={currentUser} />
 
 
-    {/* 🔑 ログイン */}
-    <button
-      onClick={() => {}}
-      style={{
-        padding: "10px 18px",
-        background: "#333",
-        color: "#fff",
-        border: "none",
-        borderRadius: "10px",
-        fontSize: "15px",
-        cursor: "pointer",
-      }}
-    >
-      🔑 ログイン
-    </button>
   </div>
 )}
 
-{/* ▼ ユーザーメニュー（ログイン中のみ） */}
-{user && showUserMenu && (
-  <div
-    style={{
-      position: "fixed",
-      top: "70px",
-      right: "16px",
-      padding: "12px",
-      background: "#222",
-      color: "#fff",
-      borderRadius: "12px",
-      boxShadow: "0 5px 15px rgba(0,0,0,0.3)",
-      zIndex: 9999,
-      minWidth: "180px",
-      animation: "fadeIn 0.15s ease",
-    }}
-  >
-    {/* プロフィール表示 */}
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        marginBottom: "12px",
-      }}
-    >
-      <img
-        src={user.picture}
-        alt="icon"
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          objectFit: "cover",
-        }}
-      />
-      <div style={{ fontSize: "14px", fontWeight: 600 }}>
-        {user.name}
-      </div>
-    </div>
 
-    {/* 閉じるボタン */}
-    <button
-      style={{
-        width: "100%",
-        padding: "8px 0",
-        background: "#555",
-        color: "#fff",
-        border: "none",
-        borderRadius: "8px",
-        cursor: "pointer",
-        fontSize: "14px",
-        marginBottom: "10px",
-      }}
-      onClick={() => setShowUserMenu(false)}
-    >
-      閉じる
-    </button>
-
-    {/* ログアウトボタン */}
-    <button
-      style={{
-        width: "100%",
-        padding: "8px 0",
-        background: "#c0392b",
-        color: "#fff",
-        border: "none",
-        borderRadius: "8px",
-        cursor: "pointer",
-        fontSize: "14px",
-      }}
-      onClick={() => {
-        localStorage.removeItem("loginToken");
-        setUser(null);
-        setShowUserMenu(false);
-      }}
-    >
-      ログアウト
-    </button>
-  </div>
-)}
     {/* ヘッダー（ページ内） */}
     <div
       className="topicHead"
@@ -2203,22 +2094,21 @@ useEffect(() => {
       <div
         className="panel"
         style={{
-          maxHeight: "80vh",          // ★ 画面内に収める
+          maxHeight: "80vh",
           display: "flex",
           flexDirection: "column",
         }}
       >
         <h3>参加設定</h3>
 
-        {/* ===== ここからスクロール領域 ===== */}
+        {/* ===== スクロール領域 ===== */}
         <div
           style={{
-            flex: 1,                 // ★ 残り高さを使う
-            overflowY: "auto",       // ★ 中だけスクロール
+            flex: 1,
+            overflowY: "auto",
             paddingRight: 6,
           }}
         >
-
 
           {/* === チーム名 === */}
           <div className="row">
@@ -2231,99 +2121,100 @@ useEffect(() => {
           </div>
 
           {/* === ユーザー名一覧 === */}
-          <div className="row" style={{ alignItems: "flex-start" }}>
-            <span className="hint" style={{ width: 90 }}>ユーザー名</span>
-
+          {userList.map((u, i) => (
             <div
+              key={i}
               style={{
                 display: "flex",
-                flexDirection: "column",
                 gap: 6,
-                flex: 1,
+                alignItems: "center",
+                opacity: u.removed ? 0.4 : 1,
+                transition: "opacity 0.2s",
               }}
             >
-              {userList.map((u, i) => (
-                <div
-                  key={i}
-                  style={{ display: "flex", gap: 6, alignItems: "center" }}
+              <input
+                value={u.name ?? ""}
+                disabled={u.removed}
+                onChange={(e) => {
+                  const list = [...userList];
+                  list[i] = { ...list[i], name: e.target.value };
+                  setUserList(list);
+                }}
+                placeholder={`名前${i + 1}`}
+                style={{ flex: 1 }}
+              />
+
+              {/* 👤 この人で入る */}
+              <button
+                className="btnDark"
+                disabled={u.removed}
+                onClick={() => {
+                  if (!u.name.trim()) {
+                    alert("名前を入力してください");
+                    return;
+                  }
+
+                  const uid = u.name.trim();
+                  localStorage.setItem("currentUserName", uid);
+                  localStorage.setItem("currentUserId", uid);
+                  localStorage.setItem("teamName", teamName);
+
+                  const url =
+                    `${window.location.origin}` +
+                    `/?team=${encodeURIComponent(teamName)}` +
+                    `&user=${encodeURIComponent(uid)}`;
+
+                  window.open(url, "_blank");
+                  setGateOpen(false);
+                }}
+              >
+                入る
+              </button>
+
+              {/* ＋ / − */}
+              {u.removed ? (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    const list = [...userList];
+                    list[i] = { ...list[i], removed: false };
+                    setUserList(list);
+                  }}
+                  style={{ width: 36, height: 36 }}
                 >
-                  <input
-                    value={u}
-                    onChange={(e) => {
-                      const list = [...userList];
-                      list[i] = e.target.value;
-                      setUserList(list);
-                    }}
-                    placeholder={`名前${i + 1}`}
-                    style={{ flex: 1 }}
-                  />
-
-                  {/* 👤 この人で入る */}
-                  <button
-                    className="btnDark"
-                    onClick={() => {
-                      if (!u.trim()) {
-                        alert("名前を入力してください");
-                        return;
-                      }
-
-                      const uid = u;
-                      localStorage.setItem("currentUserName", u);
-                      localStorage.setItem("currentUserId", uid);
-                      localStorage.setItem("teamName", teamName);
-
-                      const url =
-                        `${window.location.origin}` +
-                        `/?team=${encodeURIComponent(teamName)}` +
-                        `&user=${encodeURIComponent(uid)}`;
-
-                      window.open(url, "_blank");
-                      setGateOpen(false);
-                    }}
-                  >
-                    入る
-                  </button>
-
-                  {/* 追加 / 削除 */}
-                  {i === 0 ? (
-                    <button
-                      className="btn"
-                      onClick={() => setUserList([...userList, ""])}
-                      style={{
-                        width: 36,
-                        height: 36,
-                        fontSize: "1rem",
-                        borderRadius: 8,
-                        background: "#e5e7eb",
-                        color: "#2563eb",
-                      }}
-                    >
-                      ＋
-                    </button>
-                  ) : (
-                    <button
-                      className="btn"
-                      onClick={() => {
-                        const list = userList.filter((_, idx) => idx !== i);
-                        setUserList(list);
-                      }}
-                      style={{
-                        width: 36,
-                        height: 36,
-                        fontSize: "1rem",
-                        borderRadius: 8,
-                        border: "1.5px solid #b91c1c",
-                        background: "#fee2e2",
-                        color: "#b91c1c",
-                      }}
-                    >
-                      −
-                    </button>
-                  )}
-                </div>
-              ))}
+                  ＋
+                </button>
+              ) : i === 0 ? (
+                <button
+                  className="btn"
+                  onClick={() =>
+                    setUserList([...userList, { name: "", removed: false }])
+                  }
+                  style={{ width: 36, height: 36 }}
+                >
+                  ＋
+                </button>
+              ) : (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    const list = [...userList];
+                    list[i] = { ...list[i], removed: true };
+                    setUserList(list);
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    border: "1.5px solid #b91c1c",
+                    background: "#fee2e2",
+                    color: "#b91c1c",
+                  }}
+                >
+                  −
+                </button>
+              )}
             </div>
-          </div>
+          ))}
         </div>
         {/* ===== スクロール領域ここまで ===== */}
 
@@ -2332,11 +2223,25 @@ useEffect(() => {
           <button
             className="btn"
             style={{ marginTop: 12 }}
-            onClick={() => {
-              const cleaned = userList.map((u) => u.trim());
-              setUserList(cleaned);
-              localStorage.setItem("userList", JSON.stringify(cleaned));
+            onClick={async () => {
+              const removedUsers = userList.filter(u => u.removed);
+
+              if (removedUsers.length > 0) {
+                const ok = window.confirm(
+                  "本当に保存しますか？\n除籍した人のデータは削除され、元に戻せません。"
+                );
+                if (!ok) return;
+              }
+
+              // ✅ UI状態をそのまま保存（重要）
+              localStorage.setItem("userList", JSON.stringify(userList));
               localStorage.setItem("teamName", teamName);
+
+              // （必要ならここでサーバ送信）
+              // const activeNames = userList
+              //   .filter(u => !u.removed)
+              //   .map(u => u.name.trim())
+              //   .filter(Boolean);
 
               setGateOpen(false);
             }}
@@ -2348,6 +2253,7 @@ useEffect(() => {
     </div>
   )
 )}
+
 
 {/* 終結モーダル */}
 {finalOpen && (

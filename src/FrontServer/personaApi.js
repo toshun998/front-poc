@@ -84,9 +84,12 @@ export const getTeamState = async (teamName) => {
  * ※ 個人入力は絶対に含めない
 
 
-// ==============================
+// ==========
+// ====================
 // 6. UserState（個人入力・思考データ）
 // ==============================
+
+
 
 /**
  * 個人入力を保存
@@ -103,6 +106,16 @@ export const saveUserState = async (payload) => {
   return res.json();
 };
 
+export const updateTeamMembers = async ({ team, members }) => {
+  if (!team || !Array.isArray(members)) {
+    throw new Error("invalid updateTeamMembers args");
+  }
+
+  return post("/team/updateMembers", {
+    team,
+    members, // string[]（確定名簿）
+  });
+};
 // ==============================
 // 7. 個人ログ一覧（LOG画面用）
 // ==============================
@@ -119,27 +132,4 @@ export const getTeamUserStates = async (teamName) => {
   return res.json(); // { users: [...] }
 };
 
-// ==============================
-// 8. Subscription
-// ==============================
-export const subscribePlan = async (user) => {
-  const res = await fetch(`${BASE}/persona/subscribe`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ user }),
-  });
 
-  if (!res.ok) throw new Error("subscribe failed");
-
-  const data = await res.json();
-
-  if (data.admin) {
-    alert("👑 管理者なので即プレミアム有効");
-  } else if (data.url) {
-    window.location.href = data.url;
-  } else {
-    alert("⚠️ サブスク登録エラー");
-  }
-
-  return data;
-};
