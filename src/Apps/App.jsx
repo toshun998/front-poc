@@ -1087,58 +1087,47 @@ async function send() {
       console.error("checkLogBias error:", e);
     }
 
-    // --- ノート生成（UI用） ---
-    const note = {
-      id: crypto.randomUUID(),
-      team: teamName,
-      q: topic || "（無題）",
-      stakeholder: selectedTarget || "（未選択）",
-      scenario: scenarioFixed ? scenario : "(未決定)",
-      premise,
-      trouble,
-      otherPrem,
-      cause,
-      idea,
-      who,
-      what,
-      how,
-      good,
-      bad,
-      plans,
-      createdAt: new Date().toISOString(),
-      author: currentUser,
-      flagsDetail,
-      allFlags,
-      a: idea || cause || premise || "(入力あり)",
-    };
+// --- ノート生成（UI用） ---
+const note = {
+  id: crypto.randomUUID(),
+  team: teamName,
+  userId: currentUserId,   // ← これだけ
+  q: topic || "（無題）",
+  stakeholder: selectedTarget || "（未選択）",
+  scenario: scenarioFixed ? scenario : "(未決定)",
+  premise,
+  trouble,
+  otherPrem,
+  cause,
+  idea,
+  plans,
+  createdAt: new Date().toISOString(),
+  flagsDetail,
+  allFlags,
+};
 
-    // --- 🔐 KV保存（送信時に1回だけ） ---
-    await saveUserState({
-      team: teamName,
-      userId: currentUserId,
-      author: currentUser,
+// --- 🔐 KV保存 ---
+await saveUserState({
+  team: teamName,
+  userId: currentUserId,   // ← 完全一致
 
-      topic,
-      target: selectedTarget,
-      scenario: scenarioFixed ? scenario : null,
+  topic,
+  target: selectedTarget,
+  scenario: scenarioFixed ? scenario : null,
 
-      premise,
-      trouble,
-      otherPrem,
-      cause,
-      idea,
-      who,
-      what,
-      how,
-      good,
-      bad,
-      plans,
+  premise,
+  trouble,
+  otherPrem,
+  cause,
+  idea,
+  plans,
 
-      flagsDetail,
-      allFlags,
+  flagsDetail,
+  allFlags,
 
-      submittedAt: note.createdAt,
-    });
+  updatedAt: note.createdAt,
+});
+
 
     // --- UI更新 ---
     setNotes((n) => [note, ...n]);
@@ -1155,23 +1144,25 @@ async function send() {
 
 
 
-// 参加設定のユーザー定義（仮除籍対応）
 const [userList, setUserList] = useState(() => {
   try {
     const saved = JSON.parse(localStorage.getItem("userList"));
 
-    // 旧形式（string[]）→ 新形式に正規化
     if (Array.isArray(saved) && saved.length > 0) {
       return saved.map((u) =>
         typeof u === "string"
-          ? { name: u, removed: false }
-          : { name: u.name || "", removed: !!u.removed }
+          ? { userId: u, name: u, removed: false }
+          : {
+              userId: u.userId || u.name || "",
+              name: u.name || u.userId || "",
+              removed: !!u.removed,
+            }
       );
     }
 
-    return [{ name: "", removed: false }];
+    return [{ userId: "", name: "", removed: false }];
   } catch {
-    return [{ name: "", removed: false }];
+    return [{ userId: "", name: "", removed: false }];
   }
 });
 
@@ -1335,129 +1326,112 @@ function exportLogPdf(payload = {}) {
   pdf.save(filename);
 }
 
-//A! 全員分名簿確定
-function getConfirmedUsers(teamName) {
-  try {
-    const list = JSON.parse(
-      localStorage.getItem(`confirmedUserList:${teamName}`) || "[]"
-    );
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
 
 // A! 全員分LOG PDF（確定名簿のみ）
 function downloadAllLogsAsPDF(userLogs, teamName) {
-  if (!userLogs || userLogs.length === 0) {
+  if (!userLogs?.length) {
     alert("ログがありません");
-    return;
-  }
-
-  // 🔵 確定名簿
-  const confirmedUsers = getConfirmedUsers(teamName);
-  if (confirmedUsers.length === 0) {
-    alert("確定名簿がありません。名簿を保存してください。");
-    return;
-  }
-
-  // 🔵 フィルタ
-  const filteredLogs = userLogs.filter(l =>
-    confirmedUsers.includes(l.author)
-  );
-
-  if (filteredLogs.length === 0) {
-    alert("確定名簿に対応するログがありません");
     return;
   }
 
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   pdf.setFont("NotoSansJP-Regular", "normal");
 
+  const PAGE_BOTTOM = 280;
   let y = 15;
 
   pdf.setFontSize(16);
   pdf.text(`個人ログ一覧（${teamName}）`, 15, y);
   y += 10;
 
-  filteredLogs.forEach((log) => {
-    if (y > 260) {
+  userLogs.forEach((log, index) => {
+    const name = log.author || log.userId || "未入力";
+
+    // --- このユーザーが使う高さを概算 ---
+    const baseLines = 8; // 基本項目
+    const planLines = Math.max(log.plans?.length || 0, 1) * 7;
+    const estimatedHeight = 6 + (baseLines + planLines) * 5 + 10;
+
+    // ★ 途中で切れそうなら最初から改ページ
+    if (y + estimatedHeight > PAGE_BOTTOM) {
       pdf.addPage();
       y = 15;
     }
 
+    // --- ユーザー見出し ---
     pdf.setFontSize(13);
-    pdf.text(`■ ${log.author || "未記入"}`, 15, y);
+    pdf.text(`■ ${name}`, 15, y);
     y += 6;
 
     pdf.setFontSize(11);
 
-    const lines = [
-      `議題：${log.topic || "—"}`,
-      `ターゲット：${log.target || "—"}`,
-      `シナリオ：${log.scenario || "—"}`,
-      `前提：${log.premise || "—"}`,
-      `困りごと：${log.trouble || "—"}`,
-      `原因：${log.cause || "—"}`,
-      `対策：${log.idea || "—"}`,
+    const baseFields = [
+      ["議題", log.topic],
+      ["ターゲット", log.target],
+      ["シナリオ", log.scenario],
+      ["前提", log.premise],
+      ["困りごと", log.trouble],
+      ["他の前提", log.otherPrem],
+      ["原因", log.cause],
+      ["対策", log.idea],
     ];
 
-    lines.forEach((line) => {
-      if (y > 280) {
-        pdf.addPage();
-        y = 15;
-      }
-      pdf.text(line, 20, y);
+    baseFields.forEach(([label, value]) => {
+      pdf.text(`${label}：${value || "—"}`, 20, y);
       y += 5;
     });
 
-    y += 6;
+    // --- 計画 ---
+    if (Array.isArray(log.plans) && log.plans.length > 0) {
+      log.plans.forEach((p, i) => {
+        y += 3;
+        pdf.text(`【計画${i + 1}】`, 20, y);
+        y += 5;
+
+        [
+          ["考案者", p.who],
+          ["実行者", p.executor],
+          ["何を", p.what],
+          ["どうやって", p.how],
+          ["良い予想", p.good],
+          ["悪い予想", p.bad],
+        ].forEach(([label, value]) => {
+          pdf.text(`${label}：${value || "—"}`, 25, y);
+          y += 5;
+        });
+      });
+    } else {
+      y += 3;
+      pdf.text("【計画】—", 20, y);
+      y += 5;
+    }
+
+    // ユーザー区切り
+    y += 5;
   });
 
-  pdf.save(`logs_${teamName}_confirmed.pdf`);
+  pdf.save(`logs_${teamName}.pdf`);
 }
+
 
 
 // A! 全員分LOG CSV（確定名簿のみ）
 function downloadAllLogsAsCSV(userLogs, teamName) {
-  if (!userLogs || userLogs.length === 0) {
+  if (!userLogs?.length) {
     alert("ログがありません");
     return;
   }
 
-  // 🔵 確定名簿を取得
-  const confirmedUsers = getConfirmedUsers(teamName);
-  if (confirmedUsers.length === 0) {
-    alert("確定名簿がありません。名簿を保存してください。");
-    return;
-  }
+  const users = userLogs.map(l => l.author || l.userId || "未入力");
 
-  // 🔵 確定名簿に含まれる人だけ抽出
-  const filteredLogs = userLogs.filter(l =>
-    confirmedUsers.includes(l.author)
-  );
-
-  if (filteredLogs.length === 0) {
-    alert("確定名簿に対応するログがありません");
-    return;
-  }
-
-  // ユーザー名一覧（列）
-  const users = filteredLogs.map(l => l.author || "未記入");
-
-  // 最大計画数
   const maxPlans = Math.max(
-    ...filteredLogs.map(l => Array.isArray(l.plans) ? l.plans.length : 0),
+    ...userLogs.map(l => Array.isArray(l.plans) ? l.plans.length : 0),
     0
   );
 
   const rows = [];
-
-  // === ヘッダー ===
   rows.push(["ユーザー名", ...users]);
 
-  // === 基本項目 ===
   const baseFields = [
     ["議題", "topic"],
     ["ターゲット", "target"],
@@ -1472,54 +1446,38 @@ function downloadAllLogsAsCSV(userLogs, teamName) {
   baseFields.forEach(([label, key]) => {
     rows.push([
       label,
-      ...filteredLogs.map(l => l[key] || "—")
+      ...userLogs.map(l => l[key] || "—")
     ]);
   });
 
-  // === 計画 ===
   for (let i = 0; i < maxPlans; i++) {
-    rows.push([
-      `計画${i + 1}_考案者`,
-      ...filteredLogs.map(l => l.plans?.[i]?.who || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_実行者`,
-      ...filteredLogs.map(l => l.plans?.[i]?.executor || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_何を`,
-      ...filteredLogs.map(l => l.plans?.[i]?.what || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_どうやって`,
-      ...filteredLogs.map(l => l.plans?.[i]?.how || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_良い予想`,
-      ...filteredLogs.map(l => l.plans?.[i]?.good || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_悪い予想`,
-      ...filteredLogs.map(l => l.plans?.[i]?.bad || "—")
-    ]);
+    [
+      ["考案者", "who"],
+      ["実行者", "executor"],
+      ["何を", "what"],
+      ["どうやって", "how"],
+      ["良い予想", "good"],
+      ["悪い予想", "bad"],
+    ].forEach(([label, key]) => {
+      rows.push([
+        `計画${i + 1}_${label}`,
+        ...userLogs.map(l => l.plans?.[i]?.[key] || "—")
+      ]);
+    });
   }
 
-  // === CSV生成 ===
-  const csvBody = rows
-    .map(r =>
-      r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
-    )
+  const csv = rows
+    .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
     .join("\n");
 
-  const bom = "\uFEFF";
-  const blob = new Blob([bom + csvBody], {
+  const blob = new Blob(["\uFEFF" + csv], {
     type: "text/csv;charset=utf-8;",
   });
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `logs_${teamName}_confirmed.csv`;
+  a.download = `logs_${teamName}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1530,7 +1488,9 @@ function downloadAllLogsAsCSV(userLogs, teamName) {
 
 
 
-//A! LOGを見る更新ボタン関数
+
+
+// A! LOGを見る更新ボタン関数（修正版）
 async function refreshLogs() {
   if (isRefreshing) return;
 
@@ -1539,20 +1499,30 @@ async function refreshLogs() {
 
   try {
     const res = await getTeamUserStates(teamName);
-    setUserLogs(res.users || []);
-    
-    // ✔ 表示
-    setRefreshDone(true);
 
-    // ✔ を1秒だけ表示
-    setTimeout(() => {
-      setRefreshDone(false);
-    }, 1000);
+    const normalized = (res.users || [])
+      .filter(u => u && u.userId) // ★ userId があるものだけ
+      .map(u => ({
+        ...u,
+        author: typeof u.author === "string"
+          ? u.author
+          : u.userId,          // ★ 表示名は userId に統一
+      }))
+      // （任意）新しい順
+      .sort((a, b) =>
+        new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)
+      );
+
+    setUserLogs(normalized);
+
+    setRefreshDone(true);
+    setTimeout(() => setRefreshDone(false), 1000);
 
   } finally {
     setIsRefreshing(false);
   }
 }
+
 
 
 
@@ -1606,6 +1576,60 @@ const [selectedLog, setSelectedLog] = useState(null);
 const [logSearch, setLogSearch] = useState("");
 const [dlSelectOpen, setDlSelectOpen] = useState(false);
 const [logsForDownload, setLogsForDownload] = useState([]);
+
+
+//A! LOGを見る空LOG
+const logMap = new Map(
+  userLogs.map(l => [l.userId, l])
+);
+
+const displayUsers = userList
+  .filter(u => !u.removed && (u.userId || u.name))
+  .map(u => {
+    const uid = u.userId || u.name; // ← ここが超重要
+    const log = logMap.get(uid);
+    return log ?? createEmptyLog(uid, u.name || uid);
+  });
+function buildAllLogsForDownload(userList, userLogs) {
+  const logMap = new Map(
+    userLogs.map(l => [l.userId, l])
+  );
+
+  return userList
+    .filter(u => !u.removed && u.name)
+    .map(u => {
+      const log = logMap.get(u.name);
+      return log ?? createEmptyLog(u.name);
+    });
+}
+
+
+function createEmptyLog(userId) {
+  return {
+    userId,
+    author: userId,
+    topic: "",
+    target: "",
+    scenario: "",
+    premise: "",
+    trouble: "",
+    otherPrem: "",
+    cause: "",
+    idea: "",
+    plans: [
+      {
+        who: "",        // ★ userId を入れない
+        executor: "",
+        what: "",
+        how: "",
+        good: "",
+        bad: "",
+      },
+    ],
+    updatedAt: null,
+    __empty: true,
+  };
+}
 
 
 //A! LOGを見る更新定義
@@ -1898,6 +1922,7 @@ const [refreshDone, setRefreshDone] = useState(false);
               </span>
             </button>
 {/* 📥 全員分DL */}
+{/* 📥 全員分DL */}
 <button
   className="btn"
   style={{
@@ -1907,38 +1932,15 @@ const [refreshDone, setRefreshDone] = useState(false);
     padding: "8px 12px",
   }}
   onClick={() => {
-    // ① 確定名簿を取得
-    let savedRoster = [];
-    try {
-      savedRoster = JSON.parse(
-        localStorage.getItem(`userList:${teamName}`) || "[]"
-      );
-    } catch {}
-
-    const confirmedNames = savedRoster
-      .filter(u => !u.removed && typeof u.name === "string")
-      .map(u => u.name.trim())
-      .filter(Boolean);
-
-    if (confirmedNames.length === 0) {
-      alert("確定名簿がありません。名簿を保存してください。");
+    if (!userList || userList.length === 0) {
+      alert("参加者がいません。");
       return;
     }
 
-    // ② 確定名簿に対応するログだけ抽出（防御）
-    const confirmedLogs = userLogs.filter(log => {
-      const author =
-        typeof log.author === "string" ? log.author.trim() : "";
-      return confirmedNames.includes(author);
-    });
+    // ★ 名簿ベースで「全員分ログ」を生成
+    const allLogs = buildAllLogsForDownload(userList, userLogs);
 
-    if (confirmedLogs.length === 0) {
-      alert("確定名簿に対応するログがありません。");
-      return;
-    }
-
-    // ③ DL用に保存してモーダルを開く
-    setLogsForDownload(confirmedLogs);
+    setLogsForDownload(allLogs);
     setDlSelectOpen(true);
   }}
 >
@@ -1946,9 +1948,13 @@ const [refreshDone, setRefreshDone] = useState(false);
 </button>
 
 
+
+
           </div>
 
 {/* 👤 ユーザー一覧 */}
+{/* 👤 ユーザー一覧（保存済みログのみ） */}
+{/* 👤 ユーザー一覧（名簿ベース） */}
 <div
   style={{
     flex: 1,
@@ -1958,127 +1964,117 @@ const [refreshDone, setRefreshDone] = useState(false);
     gap: 8,
   }}
 >
-  {userList
-    .filter(
-      (u) =>
-        typeof u?.name === "string" &&
-        u.name.toLowerCase().includes(logSearch.toLowerCase())
+  {displayUsers
+    .filter(u =>
+      u.author.toLowerCase().includes(logSearch.toLowerCase())
     )
-    .map((u) => (
+    .map(u => (
       <button
-        key={u.name}
+        key={u.userId}
         className="btn"
         style={{
-          background: "#e5e7eb",
-          color: "#111",
+          background: u.__empty ? "#f3f4f6" : "#e5e7eb",
           textAlign: "center",
-          opacity: u.removed ? 0.4 : 1,
         }}
-        onClick={() => {
-          const hit =
-            userLogs.find((l) => l.author === u.name) || null;
-
-          setSelectedLog(
-            hit ? hit : { author: u.name, __empty: true }
-          );
-        }}
+        onClick={() => setSelectedLog({ ...u })}
       >
-        {u.name}
+        {u.author}
+        {u.__empty && "（未入力）"}
       </button>
     ))}
 
-  {userList.filter(
-    (u) =>
-      typeof u?.name === "string" &&
-      u.name.toLowerCase().includes(logSearch.toLowerCase())
-  ).length === 0 && (
-    <div className="hint">該当する名前がありません</div>
+  {displayUsers.length === 0 && (
+    <div className="hint">参加者がいません</div>
   )}
 </div>
+
+
 
         </>
       )}
 
       {/* ===== 詳細表示 ===== */}
-      {selectedLog && (
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            fontSize: 13,
-            lineHeight: 1.7,
-            paddingRight: 6,
-          }}
-        >
-          {/* 👤 誰のログか */}
-          <div
-            style={{
-              fontWeight: "bold",
-              fontSize: 14,
-              marginBottom: 6,
-            }}
-          >
-            {selectedLog.author} のログ
-          </div>
+{/* ===== 詳細表示 ===== */}
+{selectedLog && (
+  <div
+    style={{
+      flex: 1,
+      overflowY: "auto",
+      fontSize: 13,
+      lineHeight: 1.7,
+      paddingRight: 6,
+    }}
+  >
+    {/* 👤 誰のログか */}
+    <div
+      style={{
+        fontWeight: "bold",
+        fontSize: 14,
+        marginBottom: 6,
+      }}
+    >
+      {selectedLog.author} のログ
+    </div>
 
-          {selectedLog.__empty ? (
-            <div className="hint">
-              このユーザーのログはまだ作成されていません
-            </div>
-          ) : (
-            <>
-              <div className="hint" style={{ marginBottom: 6 }}>
-                最終更新：
-                {selectedLog.updatedAt
-                  ? new Date(selectedLog.updatedAt).toLocaleString("ja-JP")
-                  : "—"}
-              </div>
-
-              <hr />
-
-              <div><b>議題：</b>{selectedLog.topic || "—"}</div>
-              <div><b>ターゲット：</b>{selectedLog.target || "—"}</div>
-              <div><b>シナリオ：</b>{selectedLog.scenario || "—"}</div>
-
-              <hr />
-
-              <div><b>前提</b><br />{selectedLog.premise || "—"}</div>
-              <div><b>困りごと</b><br />{selectedLog.trouble || "—"}</div>
-              <div><b>他の前提</b><br />{selectedLog.otherPrem || "—"}</div>
-              <div><b>原因</b><br />{selectedLog.cause || "—"}</div>
-              <div><b>対策</b><br />{selectedLog.idea || "—"}</div>
-
-              <hr />
-
-              <b>計画</b>
-              {Array.isArray(selectedLog.plans) &&
-              selectedLog.plans.length > 0 ? (
-                selectedLog.plans.map((p, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 6,
-                      padding: 8,
-                      marginTop: 8,
-                      background: "#fafafa",
-                    }}
-                  >
-                    <div><b>考案者：</b>{p.who || "—"}</div>
-                    <div><b>実行者：</b>{p.executor || "—"}</div>
-                    <div><b>何を：</b>{p.what || "—"}</div>
-                    <div><b>どうやって：</b>{p.how || "—"}</div>
-                    <div><b>良い予想：</b>{p.good || "—"}</div>
-                    <div><b>悪い予想：</b>{p.bad || "—"}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="hint">計画はありません</div>
-              )}
-            </>
-          )}
+    {selectedLog.__empty ? (
+      <div className="hint">
+        このユーザーのログはまだ作成されていません
+      </div>
+    ) : (
+      <>
+        <div className="hint" style={{ marginBottom: 6 }}>
+          最終更新：
+          {selectedLog.updatedAt
+            ? new Date(selectedLog.updatedAt).toLocaleString("ja-JP")
+            : "—"}
         </div>
-      )}
+
+        <hr />
+
+        <div><b>議題：</b>{selectedLog.topic || "—"}</div>
+        <div><b>ターゲット：</b>{selectedLog.target || "—"}</div>
+        <div><b>シナリオ：</b>{selectedLog.scenario || "—"}</div>
+
+        <hr />
+
+        <div><b>前提</b><br />{selectedLog.premise || "—"}</div>
+        <div><b>困りごと</b><br />{selectedLog.trouble || "—"}</div>
+        <div><b>他の前提</b><br />{selectedLog.otherPrem || "—"}</div>
+        <div><b>原因</b><br />{selectedLog.cause || "—"}</div>
+        <div><b>対策</b><br />{selectedLog.idea || "—"}</div>
+
+        <hr />
+
+        <b>計画</b>
+        {Array.isArray(selectedLog.plans) &&
+        selectedLog.plans.length > 0 ? (
+          selectedLog.plans.map((p, i) => (
+            <div
+              key={i}
+              style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                padding: 8,
+                marginTop: 8,
+                background: "#fafafa",
+              }}
+            >
+              <div><b>考案者：</b>{p.who || "—"}</div>
+              <div><b>実行者：</b>{p.executor || "—"}</div>
+              <div><b>何を：</b>{p.what || "—"}</div>
+              <div><b>どうやって：</b>{p.how || "—"}</div>
+              <div><b>良い予想：</b>{p.good || "—"}</div>
+              <div><b>悪い予想：</b>{p.bad || "—"}</div>
+            </div>
+          ))
+        ) : (
+          <div className="hint">計画はありません</div>
+        )}
+      </>
+    )}
+  </div>
+)}
+
 
       {/* ===== フッター ===== */}
       <div style={{ marginTop: 12, textAlign: "right" }}>
