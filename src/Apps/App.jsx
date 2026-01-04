@@ -1231,6 +1231,42 @@ useEffect(() => {
     setStep("join");
   }
 }, []);
+//A! 参加設定/kv削除
+async function deleteTeam() {
+  if (!teamName) return alert("チーム名が未設定です");
+
+  if (!window.confirm(`⚠ チーム「${teamName}」の記録をすべて削除しますか？`)) return;
+  if (!window.confirm("最終確認です。完全に削除されます。")) return;
+
+  try {
+    const res = await fetch(
+      `https://ms-engine-test.s-yamane.workers.dev/persona/teamState?team=${encodeURIComponent(teamName)}`,
+      { method: "DELETE" }
+    );
+
+    if (!res.ok) throw new Error("delete failed");
+
+    const json = await res.json();
+
+    alert(`チーム ${teamName} を削除しました（${json.deleted}件）`);
+
+    // UIリセット
+    setUserLogs([]);
+    setSelectedLog(null);
+    setLogOpen(false);
+
+    localStorage.removeItem(`userList:${teamName}`);
+    localStorage.removeItem("teamName");
+
+  } catch (e) {
+    console.error(e);
+    alert("削除に失敗しました");
+  }
+}
+
+
+
+
 
 
 
@@ -1871,89 +1907,95 @@ const [refreshDone, setRefreshDone] = useState(false);
       {/* ===== 一覧状態 ===== */}
       {!selectedLog && (
         <>
-          {/* 🔍 検索 + 更新 + DL */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 10,
-            }}
-          >
-            <input
-              type="text"
-              placeholder="名前で検索"
-              value={logSearch}
-              onChange={(e) => setLogSearch(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "1px solid #ccc",
-                fontSize: 14,
-              }}
-            />
-
-            {/* 🔄 最新取得 */}
-            <button
-              className="btn"
-              title="最新のログを取得"
-              style={{
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: "#f3f4f6",
-                fontSize: 16,
-                opacity: isRefreshing ? 0.6 : 1,
-                pointerEvents: isRefreshing ? "none" : "auto",
-              }}
-              onClick={refreshLogs}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  animation:
-                    isRefreshing && !refreshDone
-                      ? "spin 1s linear infinite"
-                      : "none",
-                  color: refreshDone ? "#16a34a" : "inherit",
-                }}
-              >
-                {refreshDone ? "✔" : "⟳"}
-              </span>
-            </button>
-{/* 📥 全員分DL */}
-{/* 📥 全員分DL */}
-<button
-  className="btn"
+{/* 🔍 検索 + 更新 + DL + 削除 */}
+<div
   style={{
-    background: "#2563eb",
-    color: "#fff",
-    whiteSpace: "nowrap",
-    padding: "8px 12px",
-  }}
-  onClick={() => {
-    if (!userList || userList.length === 0) {
-      alert("参加者がいません。");
-      return;
-    }
-
-    // ★ 名簿ベースで「全員分ログ」を生成
-    const allLogs = buildAllLogsForDownload(userList, userLogs);
-
-    setLogsForDownload(allLogs);
-    setDlSelectOpen(true);
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
   }}
 >
-  全員分DL
-</button>
+  <input
+    type="text"
+    placeholder="名前で検索"
+    value={logSearch}
+    onChange={(e) => setLogSearch(e.target.value)}
+    style={{
+      flex: 1,
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: "1px solid #ccc",
+      fontSize: 14,
+    }}
+  />
 
+  {/* 🔄 最新取得 */}
+  <button
+    className="btn"
+    title="最新のログを取得"
+    style={{
+      padding: "8px 10px",
+      borderRadius: 8,
+      background: "#f3f4f6",
+      fontSize: 16,
+      opacity: isRefreshing ? 0.6 : 1,
+      pointerEvents: isRefreshing ? "none" : "auto",
+    }}
+    onClick={refreshLogs}
+  >
+    <span
+      style={{
+        display: "inline-block",
+        animation:
+          isRefreshing && !refreshDone
+            ? "spin 1s linear infinite"
+            : "none",
+        color: refreshDone ? "#16a34a" : "inherit",
+      }}
+    >
+      {refreshDone ? "✔" : "⟳"}
+    </span>
+  </button>
 
+  {/* 📥 全員分DL */}
+  <button
+    className="btn"
+    style={{
+      background: "#2563eb",
+      color: "#fff",
+      whiteSpace: "nowrap",
+      padding: "8px 12px",
+    }}
+    onClick={() => {
+      if (!userList || userList.length === 0) {
+        alert("参加者がいません。");
+        return;
+      }
 
+      const allLogs = buildAllLogsForDownload(userList, userLogs);
+      setLogsForDownload(allLogs);
+      setDlSelectOpen(true);
+    }}
+  >
+    全員分DL
+  </button>
 
-          </div>
+  {/* 🗑 チーム記録を削除 */}
+  <button
+    className="btn"
+    style={{
+      background: "#b91c1c",
+      color: "#fff",
+      whiteSpace: "nowrap",
+      padding: "8px 12px",
+    }}
+    onClick={deleteTeam}
+  >
+    🗑 削除
+  </button>
+</div>
 
-{/* 👤 ユーザー一覧 */}
-{/* 👤 ユーザー一覧（保存済みログのみ） */}
 {/* 👤 ユーザー一覧（名簿ベース） */}
 <div
   style={{
@@ -2093,7 +2135,10 @@ const [refreshDone, setRefreshDone] = useState(false);
         </button>
       </div>
     </div>
+
   </div>
+
+
 )}
 
 
@@ -2498,8 +2543,12 @@ const [refreshDone, setRefreshDone] = useState(false);
           </>
         )}
       </div>
+
+
+
     </div>
   )
+  
 )}
 
 
