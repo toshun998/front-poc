@@ -463,6 +463,18 @@ function defaultStakeholdersFor(topic) {
   const teamStats = useMemo(()=>{ const U=visibleNotes.filter(n=>n.author!=="noise"); const H=U.filter(n=>n.aiTag==="H").length; const E=U.filter(n=>n.aiTag==="E").length; return {H,E}; },[visibleNotes]);
 
 
+  // LOG表示用：どんな値でも安全に文字列へ
+const toText = (v) => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string" || typeof v === "number") return String(v);
+  if (typeof v === "object") {
+    if ("name" in v) return String(v.name);
+    return JSON.stringify(v);
+  }
+  return String(v);
+};
+
+
   
 //C! 偏り表示
 const OUTLIER = {
@@ -1142,6 +1154,7 @@ async function send() {
 
 
 
+
 // 参加設定のユーザー定義（仮除籍対応）
 const [userList, setUserList] = useState(() => {
   try {
@@ -1165,6 +1178,9 @@ const [userList, setUserList] = useState(() => {
 //A! 参加設定定義
 const [currentUserId, setCurrentUserId] = useState(null);
 const [currentUserName, setCurrentUserName] = useState(null);
+const [step, setStep] = useState("join"); 
+// "join" | "roster"
+
 
 //A! 参加設定エフェクト
 useEffect(() => {
@@ -1201,6 +1217,31 @@ useEffect(() => {
     setPlans(Array.isArray(my.plans) ? my.plans : []);
   })();
 }, []);
+useEffect(() => {
+  const savedTeam = localStorage.getItem("teamName");
+  if (!savedTeam) {
+    setStep("join");
+    return;
+  }
+
+  try {
+    const savedRoster = JSON.parse(
+      localStorage.getItem(`userList:${savedTeam}`) || "[]"
+    );
+
+    if (Array.isArray(savedRoster) && savedRoster.length > 0) {
+      setTeamName(savedTeam);
+      setUserList(savedRoster);
+      setStep("roster"); // ← ★これが超重要
+    } else {
+      setStep("join");
+    }
+  } catch {
+    setStep("join");
+  }
+}, []);
+
+
 
 
 //ユーザー名定義
@@ -1294,99 +1335,40 @@ function exportLogPdf(payload = {}) {
   pdf.save(filename);
 }
 
-//A! 全員分LOGPDF関数
-function downloadAllLogsAsCSV(userLogs, teamName) {
+//A! 全員分名簿確定
+function getConfirmedUsers(teamName) {
+  try {
+    const list = JSON.parse(
+      localStorage.getItem(`confirmedUserList:${teamName}`) || "[]"
+    );
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+
+// A! 全員分LOG PDF（確定名簿のみ）
+function downloadAllLogsAsPDF(userLogs, teamName) {
   if (!userLogs || userLogs.length === 0) {
     alert("ログがありません");
     return;
   }
 
-  // ユーザー名一覧
-  const users = userLogs.map(l => l.author || "未記入");
-
-  // 最大計画数を取得
-  const maxPlans = Math.max(
-    ...userLogs.map(l => Array.isArray(l.plans) ? l.plans.length : 0),
-    0
-  );
-
-  const rows = [];
-
-  // === ヘッダー行 ===
-  rows.push(["ユーザー名", ...users]);
-
-  // === 基本項目 ===
-  const baseFields = [
-    ["議題", "topic"],
-    ["ターゲット", "target"],
-    ["シナリオ", "scenario"],
-    ["前提", "premise"],
-    ["困りごと", "trouble"],
-    ["他の前提", "otherPrem"],
-    ["原因", "cause"],
-    ["対策", "idea"],
-  ];
-
-  baseFields.forEach(([label, key]) => {
-    rows.push([
-      label,
-      ...userLogs.map(l => l[key] || "—")
-    ]);
-  });
-
-  // === 計画（横展開）===
-  for (let i = 0; i < maxPlans; i++) {
-    rows.push([
-      `計画${i + 1}_考案者`,
-      ...userLogs.map(l => l.plans?.[i]?.who || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_実行者`,
-      ...userLogs.map(l => l.plans?.[i]?.executor || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_何を`,
-      ...userLogs.map(l => l.plans?.[i]?.what || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_どうやって`,
-      ...userLogs.map(l => l.plans?.[i]?.how || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_良い予想`,
-      ...userLogs.map(l => l.plans?.[i]?.good || "—")
-    ]);
-    rows.push([
-      `計画${i + 1}_悪い予想`,
-      ...userLogs.map(l => l.plans?.[i]?.bad || "—")
-    ]);
+  // 🔵 確定名簿
+  const confirmedUsers = getConfirmedUsers(teamName);
+  if (confirmedUsers.length === 0) {
+    alert("確定名簿がありません。名簿を保存してください。");
+    return;
   }
 
-  // === CSV生成（BOM付き）===
-  const csvBody = rows
-    .map(r =>
-      r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
-    )
-    .join("\n");
+  // 🔵 フィルタ
+  const filteredLogs = userLogs.filter(l =>
+    confirmedUsers.includes(l.author)
+  );
 
-  const bom = "\uFEFF";
-  const blob = new Blob([bom + csvBody], {
-    type: "text/csv;charset=utf-8;",
-  });
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `logs_${teamName}_matrix.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-
-//A! 全員分LOGCSV関数
-function downloadAllLogsAsPDF(userLogs, teamName) {
-  if (!userLogs || userLogs.length === 0) {
-    alert("ログがありません");
+  if (filteredLogs.length === 0) {
+    alert("確定名簿に対応するログがありません");
     return;
   }
 
@@ -1399,7 +1381,7 @@ function downloadAllLogsAsPDF(userLogs, teamName) {
   pdf.text(`個人ログ一覧（${teamName}）`, 15, y);
   y += 10;
 
-  userLogs.forEach((log, i) => {
+  filteredLogs.forEach((log) => {
     if (y > 260) {
       pdf.addPage();
       y = 15;
@@ -1433,8 +1415,115 @@ function downloadAllLogsAsPDF(userLogs, teamName) {
     y += 6;
   });
 
-  pdf.save(`logs_${teamName}.pdf`);
+  pdf.save(`logs_${teamName}_confirmed.pdf`);
 }
+
+
+// A! 全員分LOG CSV（確定名簿のみ）
+function downloadAllLogsAsCSV(userLogs, teamName) {
+  if (!userLogs || userLogs.length === 0) {
+    alert("ログがありません");
+    return;
+  }
+
+  // 🔵 確定名簿を取得
+  const confirmedUsers = getConfirmedUsers(teamName);
+  if (confirmedUsers.length === 0) {
+    alert("確定名簿がありません。名簿を保存してください。");
+    return;
+  }
+
+  // 🔵 確定名簿に含まれる人だけ抽出
+  const filteredLogs = userLogs.filter(l =>
+    confirmedUsers.includes(l.author)
+  );
+
+  if (filteredLogs.length === 0) {
+    alert("確定名簿に対応するログがありません");
+    return;
+  }
+
+  // ユーザー名一覧（列）
+  const users = filteredLogs.map(l => l.author || "未記入");
+
+  // 最大計画数
+  const maxPlans = Math.max(
+    ...filteredLogs.map(l => Array.isArray(l.plans) ? l.plans.length : 0),
+    0
+  );
+
+  const rows = [];
+
+  // === ヘッダー ===
+  rows.push(["ユーザー名", ...users]);
+
+  // === 基本項目 ===
+  const baseFields = [
+    ["議題", "topic"],
+    ["ターゲット", "target"],
+    ["シナリオ", "scenario"],
+    ["前提", "premise"],
+    ["困りごと", "trouble"],
+    ["他の前提", "otherPrem"],
+    ["原因", "cause"],
+    ["対策", "idea"],
+  ];
+
+  baseFields.forEach(([label, key]) => {
+    rows.push([
+      label,
+      ...filteredLogs.map(l => l[key] || "—")
+    ]);
+  });
+
+  // === 計画 ===
+  for (let i = 0; i < maxPlans; i++) {
+    rows.push([
+      `計画${i + 1}_考案者`,
+      ...filteredLogs.map(l => l.plans?.[i]?.who || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_実行者`,
+      ...filteredLogs.map(l => l.plans?.[i]?.executor || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_何を`,
+      ...filteredLogs.map(l => l.plans?.[i]?.what || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_どうやって`,
+      ...filteredLogs.map(l => l.plans?.[i]?.how || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_良い予想`,
+      ...filteredLogs.map(l => l.plans?.[i]?.good || "—")
+    ]);
+    rows.push([
+      `計画${i + 1}_悪い予想`,
+      ...filteredLogs.map(l => l.plans?.[i]?.bad || "—")
+    ]);
+  }
+
+  // === CSV生成 ===
+  const csvBody = rows
+    .map(r =>
+      r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
+    )
+    .join("\n");
+
+  const bom = "\uFEFF";
+  const blob = new Blob([bom + csvBody], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `logs_${teamName}_confirmed.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
 
 
@@ -1516,6 +1605,7 @@ const [selectedUserId, setSelectedUserId] = useState(null);
 const [selectedLog, setSelectedLog] = useState(null);
 const [logSearch, setLogSearch] = useState("");
 const [dlSelectOpen, setDlSelectOpen] = useState(false);
+const [logsForDownload, setLogsForDownload] = useState([]);
 
 
 //A! LOGを見る更新定義
@@ -1609,7 +1699,32 @@ const [refreshDone, setRefreshDone] = useState(false);
     >
       {headerOpen ? "≪" : "≡"}
     </button>
-    
+    {/* 👤 左上：今入っているチーム × 自分 */}
+<div
+  style={{
+    position: "fixed",
+    top: "16px",
+    left: "88px", // トグルボタンの右
+    zIndex: 9999,
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "10px 16px",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    fontWeight: 700,
+  }}
+>
+  <span style={{ fontSize: "18px" }}>
+    {teamName || "—"}
+  </span>
+  <span style={{ color: "#64748b" }}>
+    {currentUserName || "—"}
+  </span>
+</div>
+
 {/* 🔒 右上ボタンコンテナ */}
 {SHOW_DEBUG_BUTTONS && (
   <div
@@ -1662,9 +1777,7 @@ const [refreshDone, setRefreshDone] = useState(false);
     </div>
   </>
 )}
-{showLogin && (
-  <LoginModal onClose={() => setShowLogin(false)} />
-)}
+
 {view !== "HOME" && view !== "INTRO" && (
   <>
     {/* ヘッダー（ページ内） */}
@@ -1784,59 +1897,105 @@ const [refreshDone, setRefreshDone] = useState(false);
                 {refreshDone ? "✔" : "⟳"}
               </span>
             </button>
+{/* 📥 全員分DL */}
+<button
+  className="btn"
+  style={{
+    background: "#2563eb",
+    color: "#fff",
+    whiteSpace: "nowrap",
+    padding: "8px 12px",
+  }}
+  onClick={() => {
+    // ① 確定名簿を取得
+    let savedRoster = [];
+    try {
+      savedRoster = JSON.parse(
+        localStorage.getItem(`userList:${teamName}`) || "[]"
+      );
+    } catch {}
 
-            {/* 📥 全員分DL */}
-            <button
-              className="btn"
-              style={{
-                background: "#2563eb",
-                color: "#fff",
-                whiteSpace: "nowrap",
-                padding: "8px 12px",
-              }}
-              onClick={() => setDlSelectOpen(true)}
-            >
-              全員分DL
-            </button>
+    const confirmedNames = savedRoster
+      .filter(u => !u.removed && typeof u.name === "string")
+      .map(u => u.name.trim())
+      .filter(Boolean);
+
+    if (confirmedNames.length === 0) {
+      alert("確定名簿がありません。名簿を保存してください。");
+      return;
+    }
+
+    // ② 確定名簿に対応するログだけ抽出（防御）
+    const confirmedLogs = userLogs.filter(log => {
+      const author =
+        typeof log.author === "string" ? log.author.trim() : "";
+      return confirmedNames.includes(author);
+    });
+
+    if (confirmedLogs.length === 0) {
+      alert("確定名簿に対応するログがありません。");
+      return;
+    }
+
+    // ③ DL用に保存してモーダルを開く
+    setLogsForDownload(confirmedLogs);
+    setDlSelectOpen(true);
+  }}
+>
+  全員分DL
+</button>
+
+
           </div>
 
-          {/* 👤 ユーザー一覧 */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            {userList
-              .filter((name) => name.includes(logSearch))
-              .map((name) => (
-                <button
-                  key={name}
-                  className="btn"
-                  style={{
-                    background: "#e5e7eb",
-                    color: "#111",
-                    textAlign: "center",
-                  }}
-                  onClick={() => {
-                    const hit =
-                      userLogs.find((l) => l.author === name) || null;
-                    setSelectedLog(
-                      hit ? hit : { author: name, __empty: true }
-                    );
-                  }}
-                >
-                  {name}
-                </button>
-              ))}
+{/* 👤 ユーザー一覧 */}
+<div
+  style={{
+    flex: 1,
+    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  }}
+>
+  {userList
+    .filter(
+      (u) =>
+        typeof u?.name === "string" &&
+        u.name.toLowerCase().includes(logSearch.toLowerCase())
+    )
+    .map((u) => (
+      <button
+        key={u.name}
+        className="btn"
+        style={{
+          background: "#e5e7eb",
+          color: "#111",
+          textAlign: "center",
+          opacity: u.removed ? 0.4 : 1,
+        }}
+        onClick={() => {
+          const hit =
+            userLogs.find((l) => l.author === u.name) || null;
 
-            {userList.filter((name) => name.includes(logSearch)).length === 0 && (
-              <div className="hint">該当する名前がありません</div>
-            )}
-          </div>
+          setSelectedLog(
+            hit ? hit : { author: u.name, __empty: true }
+          );
+        }}
+      >
+        {u.name}
+      </button>
+    ))}
+
+  {userList.filter(
+    (u) =>
+      typeof u?.name === "string" &&
+      u.name.toLowerCase().includes(logSearch.toLowerCase())
+  ).length === 0 && (
+    <div className="hint">該当する名前がありません</div>
+  )}
+</div>
+
         </>
       )}
 
@@ -1940,6 +2099,8 @@ const [refreshDone, setRefreshDone] = useState(false);
     </div>
   </div>
 )}
+
+
 {dlSelectOpen && (
   <div
     className="gate"
@@ -1969,22 +2130,34 @@ const [refreshDone, setRefreshDone] = useState(false);
           marginBottom: 16,
         }}
       >
+        {/* ===== CSV ===== */}
         <button
           className="btn"
           style={{ background: "#16a34a", color: "#fff" }}
           onClick={() => {
-            downloadAllLogsAsCSV(userLogs, teamName);
+            if (!logsForDownload || logsForDownload.length === 0) {
+              alert("出力できるログがありません。名簿を保存してください。");
+              return;
+            }
+
+            downloadAllLogsAsCSV(logsForDownload, teamName);
             setDlSelectOpen(false);
           }}
         >
           CSVでDL
         </button>
 
+        {/* ===== PDF ===== */}
         <button
           className="btn"
           style={{ background: "#ca1919ff", color: "#fff" }}
           onClick={() => {
-            downloadAllLogsAsPDF(userLogs, teamName);
+            if (!logsForDownload || logsForDownload.length === 0) {
+              alert("出力できるログがありません。名簿を保存してください。");
+              return;
+            }
+
+            downloadAllLogsAsPDF(logsForDownload, teamName);
             setDlSelectOpen(false);
           }}
         >
@@ -2007,42 +2180,42 @@ const [refreshDone, setRefreshDone] = useState(false);
 
 
 
-
-
-
-
-
-
-
-{/* 設定変更ボタン */}
+{/*参加設定/設定変更ボタン */}
 <button
   className="btn"
   onClick={() => {
-    // 💡 userList 再読込
+    const savedTeam = localStorage.getItem("teamName");
+
+    if (!savedTeam) {
+      setStep("join");
+      setGateOpen(true);
+      return;
+    }
+
+    setTeamName(savedTeam);
+
     try {
-      const saved = JSON.parse(localStorage.getItem("userList"));
-      if (Array.isArray(saved) && saved.length > 0) {
-        setUserList(saved);
+      const savedRoster = JSON.parse(
+        localStorage.getItem(`userList:${savedTeam}`) || "[]"
+      );
 
-        // ✅ activeUser 未設定なら先頭を編集対象にする
-        if (!activeUserId) {
-          const firstName = saved[0];
-          const uid = `U_${firstName}`; // ← 例（userId体系に合わせてOK）
-
-          setActiveUserId(uid);
-          setActiveUserName(firstName);
-
-          localStorage.setItem("activeUserId", uid);
-          localStorage.setItem("activeUserName", firstName);
-        }
+      if (Array.isArray(savedRoster) && savedRoster.length > 0) {
+        setUserList(savedRoster);
+        setStep("roster"); // ← ★ここが効く
+      } else {
+        setStep("join");
       }
-    } catch {}
+    } catch {
+      setStep("join");
+    }
 
     setGateOpen(true);
   }}
 >
   設定変更
 </button>
+
+
 
           {/* 難易度 */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2072,6 +2245,8 @@ const [refreshDone, setRefreshDone] = useState(false);
   </>
 )}
 
+
+
 {/* 参加設定モーダル */}
 {gateOpen && (
   gateLoading ? (
@@ -2099,160 +2274,238 @@ const [refreshDone, setRefreshDone] = useState(false);
           flexDirection: "column",
         }}
       >
-        <h3>参加設定</h3>
 
-        {/* ===== スクロール領域 ===== */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            paddingRight: 6,
-          }}
-        >
+        {/* ===============================
+            STEP 1：チームに入る
+        =============================== */}
+        {step === "join" && (
+          <>
+            <h3>チームに入る</h3>
 
-          {/* === チーム名 === */}
-          <div className="row">
-            <span className="hint" style={{ width: 90 }}>チーム名</span>
-            <input
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              placeholder="例：T1 / 1組 / A班"
-            />
-          </div>
-
-          {/* === ユーザー名一覧 === */}
-          {userList.map((u, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                gap: 6,
-                alignItems: "center",
-                opacity: u.removed ? 0.4 : 1,
-                transition: "opacity 0.2s",
-              }}
-            >
+            <div className="row">
+              <span className="hint" style={{ width: 90 }}>チーム名</span>
               <input
-                value={u.name ?? ""}
-                disabled={u.removed}
-                onChange={(e) => {
-                  const list = [...userList];
-                  list[i] = { ...list[i], name: e.target.value };
-                  setUserList(list);
-                }}
-                placeholder={`名前${i + 1}`}
-                style={{ flex: 1 }}
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="例：T1 / 1組 / A班"
               />
+            </div>
 
-              {/* 👤 この人で入る */}
+            <div className="row" style={{ justifyContent: "flex-end" }}>
               <button
-                className="btnDark"
-                disabled={u.removed}
+                className="btn"
                 onClick={() => {
-                  if (!u.name.trim()) {
-                    alert("名前を入力してください");
+                  if (!teamName.trim()) {
+                    alert("チーム名を入力してください");
                     return;
                   }
 
-                  const uid = u.name.trim();
-                  localStorage.setItem("currentUserName", uid);
-                  localStorage.setItem("currentUserId", uid);
+                  try {
+                    const saved = JSON.parse(
+                      localStorage.getItem(`userList:${teamName}`) || "[]"
+                    );
+
+                    if (Array.isArray(saved) && saved.length > 0) {
+                      setUserList(saved);
+                    } else {
+                      setUserList([{ name: "", removed: false }]);
+                    }
+                  } catch {
+                    setUserList([{ name: "", removed: false }]);
+                  }
+
                   localStorage.setItem("teamName", teamName);
+                  setStep("roster");
+                }}
+              >
+                チームに入る
+              </button>
+            </div>
+          </>
+        )}
 
-                  const url =
-                    `${window.location.origin}` +
-                    `/?team=${encodeURIComponent(teamName)}` +
-                    `&user=${encodeURIComponent(uid)}`;
+        {/* ===============================
+            STEP 2：名簿編集
+        =============================== */}
+        {step === "roster" && (
+          <>
+            <h3>参加設定</h3>
 
-                  window.open(url, "_blank");
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                paddingRight: 6,
+              }}
+            >
+              {/* === チーム名 === */}
+              <div className="row">
+                <span className="hint" style={{ width: 90 }}>チーム名</span>
+                <input value={teamName} disabled />
+              </div>
+
+              {/* === ユーザー名一覧 === */}
+              {userList.map((u, i) => {
+                const currentUserId =
+                  localStorage.getItem("currentUserId");
+
+                const isMe =
+                  currentUserId &&
+                  u.name &&
+                  u.name === currentUserId;
+
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      alignItems: "center",
+                      opacity: u.removed ? 0.4 : 1,
+                    }}
+                  >
+                    <input
+                      value={u.name ?? ""}
+                      disabled={u.removed}
+                      onChange={(e) => {
+                        const list = [...userList];
+                        list[i] = { ...list[i], name: e.target.value };
+                        setUserList(list);
+                      }}
+                      placeholder={`名前${i + 1}`}
+                      style={{ flex: 1 }}
+                    />
+
+                    {/* 👤 この人で入る（自分自身は表示しない） */}
+                    {!u.removed && !isMe && (
+                      <button
+                        className="btnDark"
+                        onClick={() => {
+                          if (!u.name.trim()) {
+                            alert("名前を入力してください");
+                            return;
+                          }
+
+                          const uid = u.name.trim();
+                          localStorage.setItem("currentUserName", uid);
+                          localStorage.setItem("currentUserId", uid);
+                          localStorage.setItem("teamName", teamName);
+
+                          const url =
+                            `${window.location.origin}` +
+                            `/?team=${encodeURIComponent(teamName)}` +
+                            `&user=${encodeURIComponent(uid)}`;
+
+                          window.open(url, "_blank");
+                          setGateOpen(false);
+                        }}
+                      >
+                        入る
+                      </button>
+                    )}
+
+                    {/* 👤 自分表示 */}
+                    {isMe && (
+                      <span className="hint" style={{ fontSize: "0.85rem" }}>
+                        （あなた）
+                      </span>
+                    )}
+
+                    {/* ＋ / − */}
+                    {u.removed ? (
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          const list = [...userList];
+                          list[i] = { ...list[i], removed: false };
+                          setUserList(list);
+                        }}
+                        style={{ width: 36, height: 36 }}
+                      >
+                        ＋
+                      </button>
+                    ) : i === 0 ? (
+                      <button
+                        className="btn"
+                        onClick={() =>
+                          setUserList([...userList, { name: "", removed: false }])
+                        }
+                        style={{ width: 36, height: 36 }}
+                      >
+                        ＋
+                      </button>
+                    ) : (
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          const list = [...userList];
+                          list[i] = { ...list[i], removed: true };
+                          setUserList(list);
+                        }}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          border: "1.5px solid #b91c1c",
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                        }}
+                      >
+                        −
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* === 下部操作 === */}
+            <div
+              className="row"
+              style={{ justifyContent: "space-between", marginTop: 12 }}
+            >
+              <button
+                className="btn"
+                onClick={() => {
+                  localStorage.removeItem("currentUserId");
+                  localStorage.removeItem("currentUserName");
+                  localStorage.removeItem("teamName");
+
+                  setTeamName("");
+                  setUserList([{ name: "", removed: false }]);
+                  setStep("join");
+                }}
+              >
+                チームを抜ける
+              </button>
+
+              <button
+                className="btn"
+                onClick={() => {
+                  const removedUsers = userList.filter(u => u.removed);
+                  if (removedUsers.length > 0) {
+                    const ok = window.confirm(
+                      "本当に保存しますか？\n除籍した人のデータは削除され、元に戻せません。"
+                    );
+                    if (!ok) return;
+                  }
+
+                  localStorage.setItem(
+                    `userList:${teamName}`,
+                    JSON.stringify(userList)
+                  );
                   setGateOpen(false);
                 }}
               >
-                入る
+                名簿を保存
               </button>
-
-              {/* ＋ / − */}
-              {u.removed ? (
-                <button
-                  className="btn"
-                  onClick={() => {
-                    const list = [...userList];
-                    list[i] = { ...list[i], removed: false };
-                    setUserList(list);
-                  }}
-                  style={{ width: 36, height: 36 }}
-                >
-                  ＋
-                </button>
-              ) : i === 0 ? (
-                <button
-                  className="btn"
-                  onClick={() =>
-                    setUserList([...userList, { name: "", removed: false }])
-                  }
-                  style={{ width: 36, height: 36 }}
-                >
-                  ＋
-                </button>
-              ) : (
-                <button
-                  className="btn"
-                  onClick={() => {
-                    const list = [...userList];
-                    list[i] = { ...list[i], removed: true };
-                    setUserList(list);
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    border: "1.5px solid #b91c1c",
-                    background: "#fee2e2",
-                    color: "#b91c1c",
-                  }}
-                >
-                  −
-                </button>
-              )}
             </div>
-          ))}
-        </div>
-        {/* ===== スクロール領域ここまで ===== */}
-
-        {/* === 名簿保存 === */}
-        <div className="row" style={{ justifyContent: "flex-end" }}>
-          <button
-            className="btn"
-            style={{ marginTop: 12 }}
-            onClick={async () => {
-              const removedUsers = userList.filter(u => u.removed);
-
-              if (removedUsers.length > 0) {
-                const ok = window.confirm(
-                  "本当に保存しますか？\n除籍した人のデータは削除され、元に戻せません。"
-                );
-                if (!ok) return;
-              }
-
-              // ✅ UI状態をそのまま保存（重要）
-              localStorage.setItem("userList", JSON.stringify(userList));
-              localStorage.setItem("teamName", teamName);
-
-              // （必要ならここでサーバ送信）
-              // const activeNames = userList
-              //   .filter(u => !u.removed)
-              //   .map(u => u.name.trim())
-              //   .filter(Boolean);
-
-              setGateOpen(false);
-            }}
-          >
-            名簿を保存
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </div>
   )
 )}
+
 
 
 {/* 終結モーダル */}
@@ -3185,6 +3438,7 @@ const [refreshDone, setRefreshDone] = useState(false);
 
 
 {/* === ⑤ 計画と実行 === */}
+{/* === ⑤ 計画と実行 === */}
 <h3
   style={{
     margin: "12px 0 6px",
@@ -3199,11 +3453,10 @@ const [refreshDone, setRefreshDone] = useState(false);
   <button
     className="btn"
     onClick={() => {
-      const newPlans = [
-        ...plans,
+      setPlans((prev) => [
+        ...prev,
         { who: "", executor: "", what: "", how: "", good: "", bad: "" },
-      ];
-      setPlans(newPlans);
+      ]);
     }}
     style={{
       marginLeft: "4px",
@@ -3222,8 +3475,7 @@ const [refreshDone, setRefreshDone] = useState(false);
     <button
       className="btn"
       onClick={() => {
-        const newPlans = plans.slice(0, -1);
-        setPlans(newPlans);
+        setPlans((prev) => prev.slice(0, -1));
       }}
       style={{
         marginLeft: 4,
@@ -3267,9 +3519,13 @@ const [refreshDone, setRefreshDone] = useState(false);
         <input
           list={`user-options-${i}`}
           placeholder="誰が考えた？"
-          value={plan.who || ""}
+          value={String(plan.who || "")}
           onChange={(e) =>
-            updatePlan(i, { ...plan, who: e.target.value })
+            setPlans((prev) =>
+              prev.map((p, idx) =>
+                idx === i ? { ...p, who: e.target.value } : p
+              )
+            )
           }
           style={{
             width: 150,
@@ -3279,10 +3535,13 @@ const [refreshDone, setRefreshDone] = useState(false);
             borderRadius: 6,
           }}
         />
+
         <datalist id={`user-options-${i}`}>
-          {(userList || []).map((u) => (
-            <option key={u} value={u} />
-          ))}
+          {(userList || [])
+            .filter((u) => u && !u.removed)
+            .map((u, idx) => (
+              <option key={idx} value={String(u.name)} />
+            ))}
         </datalist>
       </div>
 
@@ -3334,23 +3593,35 @@ const [refreshDone, setRefreshDone] = useState(false);
       >
         <input
           placeholder="誰が"
-          value={plan.executor || ""}
+          value={String(plan.executor || "")}
           onChange={(e) =>
-            updatePlan(i, { ...plan, executor: e.target.value })
+            setPlans((prev) =>
+              prev.map((p, idx) =>
+                idx === i ? { ...p, executor: e.target.value } : p
+              )
+            )
           }
         />
         <input
           placeholder="何を"
-          value={plan.what || ""}
+          value={String(plan.what || "")}
           onChange={(e) =>
-            updatePlan(i, { ...plan, what: e.target.value })
+            setPlans((prev) =>
+              prev.map((p, idx) =>
+                idx === i ? { ...p, what: e.target.value } : p
+              )
+            )
           }
         />
         <input
           placeholder="どうやって"
-          value={plan.how || ""}
+          value={String(plan.how || "")}
           onChange={(e) =>
-            updatePlan(i, { ...plan, how: e.target.value })
+            setPlans((prev) =>
+              prev.map((p, idx) =>
+                idx === i ? { ...p, how: e.target.value } : p
+              )
+            )
           }
         />
       </div>
@@ -3388,9 +3659,13 @@ const [refreshDone, setRefreshDone] = useState(false);
 
       <input
         placeholder="良い結果の予想"
-        value={plan.good || ""}
+        value={String(plan.good || "")}
         onChange={(e) =>
-          updatePlan(i, { ...plan, good: e.target.value })
+          setPlans((prev) =>
+            prev.map((p, idx) =>
+              idx === i ? { ...p, good: e.target.value } : p
+            )
+          )
         }
         style={{
           width: "100%",
@@ -3434,9 +3709,13 @@ const [refreshDone, setRefreshDone] = useState(false);
 
       <input
         placeholder="良くない結果の予想"
-        value={plan.bad || ""}
+        value={String(plan.bad || "")}
         onChange={(e) =>
-          updatePlan(i, { ...plan, bad: e.target.value })
+          setPlans((prev) =>
+            prev.map((p, idx) =>
+              idx === i ? { ...p, bad: e.target.value } : p
+            )
+          )
         }
         style={{
           width: "100%",
@@ -3449,6 +3728,7 @@ const [refreshDone, setRefreshDone] = useState(false);
     </div>
   </div>
 ))}
+
 
 
 
@@ -3537,7 +3817,7 @@ const [refreshDone, setRefreshDone] = useState(false);
           textAlign: "center",
         }}
       >
-        Log（{currentTeam}）
+        Log（{toText(currentTeam)}）
       </div>
 
       <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
@@ -3564,56 +3844,55 @@ const [refreshDone, setRefreshDone] = useState(false);
                 textAlign: "center",
               }}
             >
-              🕒 {new Date(n.createdAt).toLocaleTimeString()}　|　{n.team} /{" "}
-              {n.author}
+              🕒 {new Date(n.createdAt).toLocaleTimeString()} ｜{" "}
+              {toText(n.team)} / {toText(n.author)}
             </div>
 
             {/* 💬 質問 */}
             <div style={{ marginBottom: 10 }}>
-              <b style={{ color: "#1e3a8a" }}>Q:</b> {n.q}
+              <b style={{ color: "#1e3a8a" }}>Q:</b> {toText(n.q)}
               <div className="hint" style={{ marginTop: 2, color: "#475569" }}>
-                S: {n.scenario}
+                S: {toText(n.scenario)}
               </div>
             </div>
 
-{/* 🧩 各セクション */}
-{[
-  ["前提", n.premise, "premise"],
-  ["困っている具体例", n.trouble, "trouble"],
-  ["他の前提", n.otherPrem, "otherPrem"],
-  ["原因", n.cause, "cause"],
-  ["対策アイデア", n.idea, "idea"],
-].map(([label, value, key]) =>
-  value ? (
-    <div
-      key={key}
-      style={{
-        marginBottom: 14,
-        padding: "10px 12px",
-        background: "#f9fafb",
-        borderRadius: 8,
-        border: "1px solid #e5e7eb",
-      }}
-    >
-      {/* ラベル + 文章 */}
-      <div style={{ marginBottom: 6 }}>
-        <b style={{ color: "#0f172a" }}>{label}:</b>{" "}
-        <span style={{ color: "#111827" }}>{value}</span>
-      </div>
+            {/* 🧩 各セクション */}
+            {[
+              ["前提", n.premise, "premise"],
+              ["困っている具体例", n.trouble, "trouble"],
+              ["他の前提", n.otherPrem, "otherPrem"],
+              ["原因", n.cause, "cause"],
+              ["対策アイデア", n.idea, "idea"],
+            ].map(([label, value, key]) =>
+              value ? (
+                <div
+                  key={key}
+                  style={{
+                    marginBottom: 14,
+                    padding: "10px 12px",
+                    background: "#f9fafb",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div style={{ marginBottom: 6 }}>
+                    <b style={{ color: "#0f172a" }}>{label}:</b>{" "}
+                    <span style={{ color: "#111827" }}>
+                      {toText(value)}
+                    </span>
+                  </div>
 
-      {/* RenderFlags（左揃え・自然配置） */}
-      <div style={{ marginTop: 4 }}>
-        <RenderFlags
-          flagsForField={n.flagsDetail?.[key]}
-          rawText={value}
-          field={key}
-          advice={n.flagsDetail?.[`${key}_advice`]}
-        />
-      </div>
-    </div>
-  ) : null
-)}
-
+                  <div style={{ marginTop: 4 }}>
+                    <RenderFlags
+                      flagsForField={n.flagsDetail?.[key]}
+                      rawText={toText(value)}
+                      field={key}
+                      advice={toText(n.flagsDetail?.[`${key}_advice`])}
+                    />
+                  </div>
+                </div>
+              ) : null
+            )}
 
             {/* 📘 計画と実行 */}
             {Array.isArray(n.plans) && n.plans.length > 0 ? (
@@ -3641,21 +3920,24 @@ const [refreshDone, setRefreshDone] = useState(false);
                     }}
                   >
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                      ({i + 1}) {p.who ? `${p.who}が考えた対策` : "（誰が考えたか未入力）"}
+                      ({i + 1}){" "}
+                      {p.who
+                        ? `${toText(p.who)}が考えた対策`
+                        : "（誰が考えたか未入力）"}
                     </div>
                     <div>
-                      誰が実行: {p.executor || "—"} ／ 何: {p.what || "—"} ／
-                      どうやって: {p.how || "—"}
+                      誰が実行: {toText(p.executor) || "—"} ／
+                      何: {toText(p.what) || "—"} ／
+                      どうやって: {toText(p.how) || "—"}
                     </div>
                     <div>
-                      良い結果の予想: {p.good || "—"} ／ 良くない結果の予想:{" "}
-                      {p.bad || "—"}
+                      良い結果の予想: {toText(p.good) || "—"} ／
+                      良くない結果の予想: {toText(p.bad) || "—"}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              // 🧩 旧形式（後方互換）
               <div
                 style={{
                   background: "#f1f5f9",
@@ -3668,12 +3950,14 @@ const [refreshDone, setRefreshDone] = useState(false);
                 }}
               >
                 <div>
-                  <b>計画と実行:</b> 誰={n.who || "—"} ／ 何={n.what || "—"} ／ どうやって=
-                  {n.how || "—"}
+                  <b>計画と実行:</b>{" "}
+                  誰={toText(n.who) || "—"} ／
+                  何={toText(n.what) || "—"} ／
+                  どうやって={toText(n.how) || "—"}
                 </div>
                 <div>
-                  結果（良い予想）: {n.good || "—"} ／ 結果（良くない予想）:{" "}
-                  {n.bad || "—"}
+                  結果（良い予想）: {toText(n.good) || "—"} ／
+                  結果（良くない予想）: {toText(n.bad) || "—"}
                 </div>
               </div>
             )}
@@ -3701,7 +3985,6 @@ const [refreshDone, setRefreshDone] = useState(false);
           </li>
         ))}
 
-        {/* ログが空の場合 */}
         {!visibleNotes.length && (
           <li
             className="hint"
@@ -3713,47 +3996,14 @@ const [refreshDone, setRefreshDone] = useState(false);
               borderRadius: 8,
             }}
           >
-            （{currentTeam} のログはまだありません）
+            （{toText(currentTeam)} のログはまだありません）
           </li>
         )}
       </ul>
-
-      {/* === スピナー === */}
-      {sending && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(255,255,255,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9998,
-            backdropFilter: "blur(2px)",
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              border: "4px solid #ddd",
-              borderTop: "4px solid #3b82f6",
-              borderRadius: "50%",
-              width: 48,
-              height: 48,
-              animation: "spin 1s linear infinite",
-              zIndex: 9999,
-            }}
-          />
-        </div>
-      )}
-
-
     </section>
   </main>
 )}
+
 
 {/* === Board === */}
 {view === "BOARD" && (
