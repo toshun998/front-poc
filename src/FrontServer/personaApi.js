@@ -168,3 +168,12 @@ export const getTeamUserStates = async (teamName) => {
   return res.json();
 };
 
+/**
+ * チームメンバー（名簿）を取得
+ * getTeamStateから users 配列を抽出する便利関数
+ */
+export const getTeamMembers = async (teamName) => {
+  const state = await getTeamState(teamName);
+  return state.users || [];
+};
+
