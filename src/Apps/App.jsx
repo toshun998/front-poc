@@ -1338,6 +1338,136 @@ export default function App() {
 
     return () => clearInterval(intervalId);
   }, [gateOpen, step, teamName, userList]);
+
+  // ============================================
+  // リアルタイム同期: 進行状況のKV自動保存（debounce 2秒）
+  // ============================================
+  const progressRef = useRef({});
+  const saveTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    // 必須条件のチェック
+    if (!teamName || !currentUserId) return;
+
+    // 現在の進行状況をまとめる
+    const currentProgress = {
+      topic,
+      target: selectedTarget,
+      scenario: scenarioFixed ? scenario : null,
+      premise,
+      trouble,
+      otherPrem,
+      cause,
+      idea,
+      plans,
+    };
+
+    // 前回と同じ内容なら保存しない
+    const prevJson = JSON.stringify(progressRef.current);
+    const currJson = JSON.stringify(currentProgress);
+    if (prevJson === currJson) return;
+
+    progressRef.current = currentProgress;
+
+    // 既存のタイマーをクリア
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // 2秒後にKVへ保存
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await saveUserState({
+          team: teamName,
+          userId: currentUserId,
+          ...currentProgress,
+          updatedAt: new Date().toISOString(),
+        });
+        console.log("✅ 進行状況を自動保存しました");
+      } catch (err) {
+        console.error("自動保存エラー:", err);
+      }
+    }, 2000);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [teamName, currentUserId, topic, selectedTarget, scenario, scenarioFixed, premise, trouble, otherPrem, cause, idea, plans]);
+
+  // ============================================
+  // リアルタイム同期: 他ユーザーの進行状況をポーリング取得（5秒）
+  // ============================================
+  useEffect(() => {
+    if (!teamName || !currentUserId) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await getTeamUserStates(teamName);
+        if (!res.users || !Array.isArray(res.users)) return;
+
+        // 他ユーザーの進行状況をnotesに反映
+        const otherUsers = res.users.filter(u => u.userId !== currentUserId);
+
+        if (otherUsers.length === 0) return;
+
+        // 他ユーザーの最新データをnotes形式に変換して追加/更新
+        setNotes(prevNotes => {
+          const updatedNotes = [...prevNotes];
+
+          for (const user of otherUsers) {
+            // 既存のノートを探す（同じuserIdかつ非noise）
+            const existingIdx = updatedNotes.findIndex(
+              n => n.userId === user.userId && n.author !== "noise"
+            );
+
+            const newNote = {
+              id: user.id || `sync-${user.userId}-${Date.now()}`,
+              team: teamName,
+              userId: user.userId,
+              author: user.userId,
+              q: user.topic || "（無題）",
+              stakeholder: user.target || "（未選択）",
+              scenario: user.scenario || "(未決定)",
+              premise: user.premise || "",
+              trouble: user.trouble || "",
+              otherPrem: user.otherPrem || "",
+              cause: user.cause || "",
+              idea: user.idea || "",
+              plans: Array.isArray(user.plans) ? user.plans : [],
+              createdAt: user.updatedAt || new Date().toISOString(),
+              flagsDetail: user.flagsDetail || {},
+              allFlags: user.allFlags || [],
+              synced: true, // 同期データのマーク
+            };
+
+            if (existingIdx >= 0) {
+              // 既存ノートを更新（updatedAtが新しい場合のみ）
+              const existing = updatedNotes[existingIdx];
+              if (new Date(newNote.createdAt) > new Date(existing.createdAt || 0)) {
+                updatedNotes[existingIdx] = newNote;
+              }
+            } else {
+              // 新規追加（内容がある場合のみ）
+              if (user.topic || user.premise || user.idea) {
+                updatedNotes.unshift(newNote);
+              }
+            }
+          }
+
+          return updatedNotes;
+        });
+
+        console.log("🔄 他ユーザーの進行状況を同期しました");
+      } catch (err) {
+        console.error("進行状況同期エラー:", err);
+      }
+    }, 5000); // 5秒間隔
+
+    return () => clearInterval(intervalId);
+  }, [teamName, currentUserId]);
+
   //A! 参加設定/kv削除
   async function deleteTeam() {
     if (!teamName) return alert("チーム名が未設定です");
