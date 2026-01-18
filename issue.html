@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>企業コード発行</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f8fafc;
+      padding: 40px;
+    }
+    form {
+      max-width: 420px;
+      background: #fff;
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,.08);
+    }
+    h1 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    pre {
+      margin-top: 16px;
+      background: #f1f5f9;
+      padding: 12px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<form id="form">
+  <h1>🏢 企業コード発行</h1>
+
+  <label>
+    企業コード
+    <input id="companyCode" placeholder="OSAKA-KOSEN" required />
+  </label>
+
+  <label>
+    企業名
+    <input id="companyName" placeholder="大阪高専" />
+  </label>
+
+  <label>
+    初期パスワード
+    <input id="password" required />
+  </label>
+
+  <label>
+    有効期限（任意）
+    <input id="expiresAt" type="date" />
+  </label>
+
+  <button type="submit">発行する</button>
+
+  <pre id="result"></pre>
+</form>
+
+<script>
+const API = "https://ms-engine-test.s-yamane.workers.dev";
+
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault();
+
+  const body = {
+    companyCode: companyCode.value.trim(),
+    companyName: companyName.value.trim(),
+    password: password.value,
+    expiresAt: expiresAt.value || null,
+  };
+
+  const res = await fetch(API + "/admin/issueCompany", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+  result.textContent = JSON.stringify(data, null, 2);
+};
+</script>
+
+</body>
+</html>

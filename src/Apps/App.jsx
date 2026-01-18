@@ -79,9 +79,43 @@ export function BrainShower() {
 }
 /* ========== App ========== */
 export default function App(){
-  const [companyReady, setCompanyReady] = useState(
-    !!localStorage.getItem("companyCode")
-  );
+const [companyReady, setCompanyReady] = useState(false);
+const [checkingCompany, setCheckingCompany] = useState(true);
+
+useEffect(() => {
+  const boot = async () => {
+    const companyCode = localStorage.getItem("companyCode");
+    if (!companyCode) {
+      setCheckingCompany(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        "https://ms-engine-test.s-yamane.workers.dev/auth/companyPing",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyCode }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.ok) {
+        setCompanyReady(true);
+      } else {
+        localStorage.removeItem("companyCode");
+      }
+    } catch {
+      localStorage.removeItem("companyCode");
+    } finally {
+      setCheckingCompany(false);
+    }
+  };
+
+  boot();
+}, []);
 
 
 const SHOW_DEBUG_BUTTONS = true;
@@ -260,7 +294,39 @@ useEffect(() => {
 }, []);
 
 
+// 定期確認
+useEffect(() => {
+  if (!companyReady) return;
 
+  const interval = setInterval(async () => {
+    const companyCode = localStorage.getItem("companyCode");
+    if (!companyCode) return;
+
+    try {
+      const res = await fetch(
+        "https://ms-engine-test.s-yamane.workers.dev/auth/companyPing",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyCode }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        // ❌ 即失効
+        localStorage.removeItem("companyCode");
+        localStorage.removeItem("companySessionExpiresAt");
+        location.reload(); // or setCompanyReady(false)
+      }
+    } catch {
+      // ネットワークエラー時は即ログアウトしない（UX配慮）
+    }
+  }, 1000 * 60 * 5); // ← 5分に1回
+
+  return () => clearInterval(interval);
+}, [companyReady]);
 
 
 
@@ -1680,13 +1746,12 @@ const [refreshDone, setRefreshDone] = useState(false);
 
 
     // ✅ return は一番最後
-  if (!companyReady) {
-    return (
-      <CompanyLoginModal
-        onSuccess={() => setCompanyReady(true)}
-      />
-    );
-  }
+if (checkingCompany) return null; // or ローディング
+
+if (!companyReady) {
+  return <CompanyLoginModal onSuccess={() => setCompanyReady(true)} />;
+}
+
 
 
 
