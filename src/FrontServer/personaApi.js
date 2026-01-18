@@ -9,6 +9,18 @@ const headers = {
   "Cache-Control": "no-store",
 };
 
+
+// ==============================
+// companyCode 共通取得
+// ==============================
+const getCompanyCode = () => {
+  const code = localStorage.getItem("companyCode");
+  if (!code) {
+    throw new Error("companyCode is missing (not logged in)");
+  }
+  return code;
+};
+
 const salt = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -16,12 +28,20 @@ const salt = () =>
 // 2. 共通 POST ヘルパー
 // ==============================
 async function post(path, body = {}) {
+  const companyCode = getCompanyCode();
+
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { ...headers, "x-otb-salt": salt() },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      companyCode,
+      ...body,
+    }),
   });
-  if (!res.ok) throw new Error(`API ${path} ${res.status}`);
+
+  if (!res.ok) {
+    throw new Error(`API ${path} ${res.status}`);
+  }
   return res.json();
 }
 
@@ -71,13 +91,16 @@ export const evidenceQuest = (topic, teamName, notes = []) =>
  * （参加者・役割など）
  */
 export const getTeamState = async (teamName) => {
+  const companyCode = getCompanyCode();
+
   const res = await fetch(
-    `${BASE}/persona/teamState?team=${encodeURIComponent(teamName)}`,
+    `${BASE}/persona/teamState?companyCode=${encodeURIComponent(companyCode)}&team=${encodeURIComponent(teamName)}`,
     { headers }
   );
   if (!res.ok) throw new Error("teamState fetch failed");
-  return res.json(); // { team, users, roles, updatedAt }
+  return res.json();
 };
+
 
 /**
  * チーム共有情報のみ保存
@@ -96,15 +119,26 @@ export const getTeamState = async (teamName) => {
  * team + userId 単位で KV に保存される
  */
 export const saveUserState = async (payload) => {
+  const companyCode = getCompanyCode();
+
   const res = await fetch(`${BASE}/persona/userState`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      companyCode,   // ← ★ 追加
+      ...payload,
+    }),
   });
 
-  if (!res.ok) throw new Error("userState save failed");
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("userState error response:", text);
+    throw new Error("userState save failed");
+  }
+
   return res.json();
 };
+
 
 export const updateTeamMembers = async ({ team, members }) => {
   if (!team || !Array.isArray(members)) {
@@ -124,12 +158,13 @@ export const updateTeamMembers = async ({ team, members }) => {
  * チーム内の全 userState を取得
  */
 export const getTeamUserStates = async (teamName) => {
+  const companyCode = getCompanyCode();
+
   const res = await fetch(
-    `${BASE}/persona/teamUserStates?team=${encodeURIComponent(teamName)}`,
+    `${BASE}/persona/teamUserStates?companyCode=${encodeURIComponent(companyCode)}&team=${encodeURIComponent(teamName)}`,
     { headers }
   );
   if (!res.ok) throw new Error("teamUserStates fetch failed");
-  return res.json(); // { users: [...] }
+  return res.json();
 };
-
 

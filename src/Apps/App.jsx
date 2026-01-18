@@ -30,6 +30,8 @@ import LoginModal from "../App_Options/LoginModal";
 import { jsPDF } from "jspdf";
 import "../Assets/NotoSansJP-Regular-normal";
 
+import CompanyLoginModal from "../App_Options/CompanyLoginModal";
+
 
 
 //A! 背景絵文字
@@ -77,8 +79,10 @@ export function BrainShower() {
 }
 /* ========== App ========== */
 export default function App(){
-//2秒ごと保存定義
-const lastSavedRef = useRef("");
+  const [companyReady, setCompanyReady] = useState(
+    !!localStorage.getItem("companyCode")
+  );
+
 
 const SHOW_DEBUG_BUTTONS = true;
 //Intro定義
@@ -1675,7 +1679,14 @@ const [refreshDone, setRefreshDone] = useState(false);
 
 
 
-
+    // ✅ return は一番最後
+  if (!companyReady) {
+    return (
+      <CompanyLoginModal
+        onSuccess={() => setCompanyReady(true)}
+      />
+    );
+  }
 
 
 
@@ -4451,6 +4462,6 @@ if (compactView) {
 
 
 
-  
+
 }
 
