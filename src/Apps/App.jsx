@@ -1609,35 +1609,18 @@ export default function App() {
     }
 
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    pdf.setFont("NotoSansJP-Regular", "normal");
 
     const PAGE_BOTTOM = 280;
-    let y = 15;
+    const yRef = { y: 15 };
 
-    pdf.setFontSize(16);
-    pdf.text(`個人ログ一覧（${teamName}）`, 15, y);
-    y += 10;
+    writeLine(pdf, `個人ログ一覧（${teamName}）`, yRef, 16, 15);
+    yRef.y += 4; // 見出し余白
 
     userLogs.forEach((log, index) => {
       const name = log.author || log.userId || "未入力";
 
-      // --- このユーザーが使う高さを概算 ---
-      const baseLines = 8; // 基本項目
-      const planLines = Math.max(log.plans?.length || 0, 1) * 7;
-      const estimatedHeight = 6 + (baseLines + planLines) * 5 + 10;
-
-      // ★ 途中で切れそうなら最初から改ページ
-      if (y + estimatedHeight > PAGE_BOTTOM) {
-        pdf.addPage();
-        y = 15;
-      }
-
       // --- ユーザー見出し ---
-      pdf.setFontSize(13);
-      pdf.text(`■ ${name}`, 15, y);
-      y += 6;
-
-      pdf.setFontSize(11);
+      writeLine(pdf, `■ ${name}`, yRef, 13, 15);
 
       const baseFields = [
         ["議題", log.topic],
@@ -1651,16 +1634,14 @@ export default function App() {
       ];
 
       baseFields.forEach(([label, value]) => {
-        pdf.text(`${label}：${value || "—"}`, 20, y);
-        y += 5;
+        writeLine(pdf, `${label}：${value || "—"}`, yRef, 11, 20);
       });
 
       // --- 計画 ---
       if (Array.isArray(log.plans) && log.plans.length > 0) {
         log.plans.forEach((p, i) => {
-          y += 3;
-          pdf.text(`【計画${i + 1}】`, 20, y);
-          y += 5;
+          yRef.y += 3;
+          writeLine(pdf, `【計画${i + 1}】`, yRef, 11, 20);
 
           [
             ["考案者", p.who],
@@ -1670,18 +1651,16 @@ export default function App() {
             ["良い予想", p.good],
             ["悪い予想", p.bad],
           ].forEach(([label, value]) => {
-            pdf.text(`${label}：${value || "—"}`, 25, y);
-            y += 5;
+            writeLine(pdf, `${label}：${value || "—"}`, yRef, 11, 25);
           });
         });
       } else {
-        y += 3;
-        pdf.text("【計画】—", 20, y);
-        y += 5;
+        yRef.y += 3;
+        writeLine(pdf, "【計画】—", yRef, 11, 20);
       }
 
       // ユーザー区切り
-      y += 5;
+      yRef.y += 5;
     });
 
     pdf.save(`logs_${teamName}.pdf`);
@@ -1808,14 +1787,21 @@ export default function App() {
   const PAGE_BOTTOM = 285;
 
   const writeLine = (pdf, text, yRef, size = 11, x = MARGIN_X) => {
-    if (yRef.y > PAGE_BOTTOM) {
-      pdf.addPage();
-      yRef.y = 15;
-    }
+    const content = String(text ?? "");
     pdf.setFontSize(size);
     pdf.setFont("NotoSansJP-Regular", "normal");
-    pdf.text([String(text ?? "")], x, yRef.y);
-    yRef.y += size + 1;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const availableTextWidth = pageWidth - x - MARGIN_X;
+    const lines = pdf.splitTextToSize(content, availableTextWidth);
+
+    for (const line of lines) {
+      if (yRef.y + size > PAGE_BOTTOM) {
+        pdf.addPage();
+        yRef.y = 15;
+      }
+      pdf.text(line, x, yRef.y);
+      yRef.y += size;
+    }
   };
   //A! 右上ログ定義
   const displayName =
