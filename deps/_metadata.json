@@ -1,0 +1,49 @@
+{
+  "hash": "cf03ce63",
+  "configHash": "30062406",
+  "lockfileHash": "053f9b55",
+  "browserHash": "3f95d511",
+  "optimized": {
+    "html2canvas": {
+      "src": "../../node_modules/html2canvas/dist/html2canvas.esm.js",
+      "file": "html2canvas.js",
+      "fileHash": "c01d52b5",
+      "needsInterop": false
+    },
+    "jspdf": {
+      "src": "../../node_modules/jspdf/dist/jspdf.es.min.js",
+      "file": "jspdf.js",
+      "fileHash": "46bd42ff",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "51c83d39",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "8f9ed1a8",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "chunk-2P6U2W7X": {
+      "file": "chunk-2P6U2W7X.js"
+    },
+    "purify.es-GPD4SSQI": {
+      "file": "purify__es-GPD4SSQI.js"
+    },
+    "index.es-ZPPD4DBB": {
+      "file": "index__es-ZPPD4DBB.js"
+    },
+    "chunk-4IG3CPVY": {
+      "file": "chunk-4IG3CPVY.js"
+    },
+    "chunk-5WRI5ZAA": {
+      "file": "chunk-5WRI5ZAA.js"
+    }
+  }
+}
