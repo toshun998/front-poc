@@ -16,6 +16,11 @@ export function OutlierBadges({ flags = [] }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
             {sortedFlags.map((f, i) => {
                 const m = OUTLIER[f] || { icon: "🙂", code: "", color: "#94a3b8", desc: String(f) };
+
+                const descText = Array.isArray(m.desc)
+                    ? m.desc[Math.floor(Math.random() * m.desc.length)]
+                    : m.desc;
+
                 return (
                     <div key={`${f}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span
@@ -35,7 +40,9 @@ export function OutlierBadges({ flags = [] }) {
                             {m.icon}
                         </span>
                         <span style={{ fontWeight: "bold", marginRight: 4 }}>{m.code}</span>
-                        <span style={{ fontSize: 13, color: "#374151" }}>{m.desc}</span>
+                        <span style={{ fontSize: 13, color: "#374151" }}>
+                            {descText}
+                        </span>
                     </div>
                 );
             })}
