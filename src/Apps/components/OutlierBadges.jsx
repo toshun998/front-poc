@@ -1,6 +1,6 @@
 // ========== 偏りバッジ＆フラグ表示 ==========
 import { useState } from "react";
-import { OUTLIER } from "../utils/helpers";
+import { OUTLIER, sortOutlierFlags } from "../utils/helpers";
 import { filterOutlierFlags } from "../utils/outlierLogic";
 
 /**
@@ -10,9 +10,11 @@ import { filterOutlierFlags } from "../utils/outlierLogic";
  */
 export function OutlierBadges({ flags = [] }) {
     if (!Array.isArray(flags) || flags.length === 0) return null;
+    // ソート済みのフラグを表示
+    const sortedFlags = sortOutlierFlags(flags);
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
-            {flags.map((f, i) => {
+            {sortedFlags.map((f, i) => {
                 const m = OUTLIER[f] || { icon: "🙂", code: "", color: "#94a3b8", desc: String(f) };
                 return (
                     <div key={`${f}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>

@@ -1,4 +1,5 @@
 // ========== 個人ログ閲覧モーダル ==========
+import { RenderFlags } from "../components/OutlierBadges";
 
 /**
  * LOGを見るモーダル
@@ -242,26 +243,71 @@ export default function LogViewerModal({
                                     <b>前提</b>
                                     <br />
                                     {selectedLog.premise || "—"}
+                                    {selectedLog.flagsDetail?.premise && (
+                                        <RenderFlags
+                                            flagsForField={selectedLog.flagsDetail.premise}
+                                            rawText={selectedLog.premise}
+                                            field="premise"
+                                            advice={selectedLog.flagsDetail.premise_advice}
+                                            teamStats={{ H: 0, E: 0 }}
+                                        />
+                                    )}
                                 </div>
                                 <div>
                                     <b>困りごと</b>
                                     <br />
                                     {selectedLog.trouble || "—"}
+                                    {selectedLog.flagsDetail?.trouble && (
+                                        <RenderFlags
+                                            flagsForField={selectedLog.flagsDetail.trouble}
+                                            rawText={selectedLog.trouble}
+                                            field="trouble"
+                                            advice={selectedLog.flagsDetail.trouble_advice}
+                                            teamStats={{ H: 0, E: 0 }}
+                                        />
+                                    )}
                                 </div>
                                 <div>
                                     <b>他の前提</b>
                                     <br />
                                     {selectedLog.otherPrem || "—"}
+                                    {selectedLog.flagsDetail?.otherPrem && (
+                                        <RenderFlags
+                                            flagsForField={selectedLog.flagsDetail.otherPrem}
+                                            rawText={selectedLog.otherPrem}
+                                            field="otherPrem"
+                                            advice={selectedLog.flagsDetail.otherPrem_advice}
+                                            teamStats={{ H: 0, E: 0 }}
+                                        />
+                                    )}
                                 </div>
                                 <div>
                                     <b>原因</b>
                                     <br />
                                     {selectedLog.cause || "—"}
+                                    {selectedLog.flagsDetail?.cause && (
+                                        <RenderFlags
+                                            flagsForField={selectedLog.flagsDetail.cause}
+                                            rawText={selectedLog.cause}
+                                            field="cause"
+                                            advice={selectedLog.flagsDetail.cause_advice}
+                                            teamStats={{ H: 0, E: 0 }}
+                                        />
+                                    )}
                                 </div>
                                 <div>
                                     <b>対策</b>
                                     <br />
                                     {selectedLog.idea || "—"}
+                                    {selectedLog.flagsDetail?.idea && (
+                                        <RenderFlags
+                                            flagsForField={selectedLog.flagsDetail.idea}
+                                            rawText={selectedLog.idea}
+                                            field="idea"
+                                            advice={selectedLog.flagsDetail.idea_advice}
+                                            teamStats={{ H: 0, E: 0 }}
+                                        />
+                                    )}
                                 </div>
 
                                 <hr />
