@@ -358,18 +358,18 @@ export default function FrontScreen({
                             {/* テキストエリアセクション（共通パターン） */}
                             {[
                                 {
-                                    label: "前提の確認（今の状況を掘り起こす）",
-                                    value: premise,
-                                    setValue: setPremise,
-                                    mic: { listening: premiseListening, start: startPremiseListening },
-                                    placeholder: "みんなが『当たり前』と思っていることは何かな？",
-                                },
-                                {
                                     label: "困っている内容の具体例",
                                     value: trouble,
                                     setValue: setTrouble,
                                     mic: { listening: troubleListening, start: startTroubleListening },
                                     placeholder: "どんなことで困っているのかな？",
+                                },
+                                {
+                                    label: "前提の確認（今の状況を掘り起こす）",
+                                    value: premise,
+                                    setValue: setPremise,
+                                    mic: { listening: premiseListening, start: startPremiseListening },
+                                    placeholder: "みんなが『当たり前』と思っていることは何かな？",
                                 },
                                 {
                                     label: "他の前提（別の見方があるとしたら）",
