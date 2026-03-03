@@ -60,6 +60,22 @@ export const explainLineEval = (topic, text) =>
 export const checkLogBias = (topic, fields) =>
   post("/persona/logBias", { topic, fields });
 
+/**
+ * チェックリスト方式でバイアス判定を行う
+ * 各バイアスタイプごとに「この発言は"X"に該当するか？yes/no」で判定
+ * @param {string} topic - 議題
+ * @param {object} fields - 各フィールド（premise, trouble, otherPrem, cause, idea）
+ * @param {string[]} biasTypes - 判定するバイアスタイプの配列（OUTLIER_ORDERから取得）
+ * @returns {Promise<object>} - 各フィールドごとのバイアス判定結果
+ */
+export const checkLogBiasChecklist = (topic, fields, biasTypes) =>
+  post("/persona/logBiasChecklist", { 
+    topic, 
+    fields, 
+    biasTypes,
+    mode: "checklist"  // チェックリスト方式であることを明示
+  });
+
 export const getNoise = (topic, note) =>
   post("/persona/noise", { topic, note });
 

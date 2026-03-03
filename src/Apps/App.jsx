@@ -7,8 +7,7 @@ import {
   saveUserState,
   getTargets,
   explainLineEval as explainLineEvalApi,
-  checkLogBias,
-  getNoise,
+  checkLogBias,  checkLogBiasChecklist,  getNoise,
   arrangeBoard,
   evidenceQuest,
   getTeamState,
@@ -31,6 +30,7 @@ import {
   normalizeStakeholders,
   toText,
   sanitizeAdvice,
+  OUTLIER_ORDER,
 } from "./utils/helpers";
 import {
   judgeOOTB,
@@ -343,13 +343,15 @@ export default function App() {
       const flagsDetail = {};
       let allFlags = [];
       try {
-        const r = await checkLogBias(topic, fields);
+        // チェックリスト方式：「不明」を除いた23種類のバイアスを個別にyes/noで判定
+        const biasTypesToCheck = OUTLIER_ORDER.filter(b => b !== "不明");
+        const r = await checkLogBiasChecklist(topic, fields, biasTypesToCheck);
         for (const [key, obj] of Object.entries(r.results || {})) {
           flagsDetail[key] = obj.flags || [];
           flagsDetail[`${key}_advice`] = obj.advice || "";
           allFlags = allFlags.concat(obj.flags || []);
         }
-      } catch (e) { console.error("checkLogBias error:", e); }
+      } catch (e) { console.error("checkLogBiasChecklist error:", e); }
 
       const note = {
         id: crypto.randomUUID(),
