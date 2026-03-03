@@ -197,9 +197,11 @@ export default function LogScreen({
                                     className="btn"
                                     onClick={() => openNoise(n)}
                                     style={{
-                                        background: "#e0f2fe",
+                                        background: "#bfe5ff",
                                         color: "#0369a1",
                                         fontWeight: 600,
+                                        padding: "15px 15px",
+                                        boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
                                     }}
                                 >
                                     AIからのヒント
