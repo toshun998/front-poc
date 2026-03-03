@@ -69,7 +69,7 @@ export const checkLogBias = (topic, fields) =>
  * @returns {Promise<object>} - 各フィールドごとのバイアス判定結果
  */
 export const checkLogBiasChecklist = (topic, fields, biasTypes) =>
-  post("/persona/logBiasChecklist", { 
+  post("/persona/logBias", { 
     topic, 
     fields, 
     biasTypes,

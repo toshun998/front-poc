@@ -138,7 +138,6 @@ export const sanitizeAdvice = (t) =>
 
 /** OUTLIER表示順序（index.tsのORDERと同期） */
 export const OUTLIER_ORDER = [
-    "短絡",
     "速断",
     "循環",
     "二択",
@@ -162,6 +161,7 @@ export const OUTLIER_ORDER = [
     "幻想",
     "矮小",
     "不明",
+    "均衡",
 ];
 
 /** フラグをORDER順にソート */
@@ -173,17 +173,6 @@ export const sortOutlierFlags = (flags) => {
 };
 
 export const OUTLIER = {
-    "短絡": {
-        icon: "⏭️",
-        code: "短絡",
-        label: "短絡",
-        color: "#ef4444",
-        desc: [
-            "それだけが理由？",
-            "他にも原因、ない？",
-            "本当にそれのせい？"
-        ],
-    },
     "速断": {
         icon: "⚡",
         code: "速断",
@@ -436,5 +425,16 @@ export const OUTLIER = {
             "判断要素を増やそう。",
             "説明を詳しく書こう"
         ], 
+    },
+    "均衡": {
+        icon: "⚖️",
+        code: "均衡",
+        label: "均衡",
+        color: "#22c55e",
+        desc: [
+            "バランス良く書けています！",
+            "特に偏りは見られません。",
+            "良いね！"
+        ],
     },
 };

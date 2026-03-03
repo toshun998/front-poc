@@ -102,14 +102,18 @@ export function filterOutlierFlags(list, field, rawText, teamStats) {
     if (!Array.isArray(list)) return [];
     const txt = String(rawText || "");
     return list.filter((f) => {
-        if (f === "仮説過多(H≫E)") {
+        // helpers.jsのOUTLIER_ORDERと同期したID名を使用
+        if (f === "楽観") {
+            // 楽観（希望的観測・仮説過多）のフィルタリング
             const { H, E } = teamStats;
             const strict = (E === 0 && H >= 3) || H >= 3 * E + 2;
             return strict;
         }
-        if (field === "trouble" && f === "因果が粗い") return false;
-        if (field === "premise" && f === "因果が粗い") return false;
-        if (field === "idea" && f === "因果が粗い" && !hasCausalCue(txt)) return false;
+        // 偶然（因果の混同・相関混同）のフィルタリング
+        if (field === "trouble" && f === "偶然") return false;
+        if (field === "premise" && f === "偶然") return false;
+        if (field === "idea" && f === "偶然" && !hasCausalCue(txt)) return false;
         return true;
     });
 }
+
