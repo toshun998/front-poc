@@ -177,7 +177,7 @@ export const OUTLIER = {
         icon: "⚡",
         code: "速断",
         label: "速断",
-        color: "#f59e0b",
+        color: "#f0db80",
         desc: [
             "みんなそうなの？",
             "たった一つで決めつけてない？",
@@ -199,7 +199,7 @@ export const OUTLIER = {
         icon: "🆚",
         code: "二択",
         label: "二択",
-        color: "#3b82f6",
+        color: "#d4e5ff",
         desc: [
             "どっちかしかないのかな？",
             "本当に二択？",
@@ -221,7 +221,7 @@ export const OUTLIER = {
         icon: "🚀",
         code: "飛躍",
         label: "飛躍",
-        color: "#f43f5e",
+        color: "#e68495",
         desc: [
             "必ずそうなる？",
             "ちょっと考えすぎじゃない？",
@@ -276,7 +276,7 @@ export const OUTLIER = {
         icon: "💥",
         code: "中傷",
         label: "中傷",
-        color: "#dc2626",
+        color: "#d48989",
         desc: [
             "それ、意見じゃなくて悪口かも。",
             "人と意見は、別じゃない？",
@@ -309,7 +309,7 @@ export const OUTLIER = {
         icon: "🧲",
         code: "巻添",
         label: "巻添",
-        color: "#ec4899",
+        color: "#e99fc4",
         desc: [
             "その人と、その仲間は別じゃない？",
             "レッテル貼りになってない？",
@@ -397,7 +397,7 @@ export const OUTLIER = {
         icon: "🌿",
         code: "幻想",
         label: "幻想",
-        color: "#059669",
+        color: "#87d3bb",
         desc: [
             "自然だから、いいの？",
             "「自然」って、どういうこと？",
