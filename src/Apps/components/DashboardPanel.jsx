@@ -29,7 +29,7 @@ import {
 export default function DashboardPanel({ companyCode }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [selectedTeam, setSelectedTeam] = useState("ALL");
+  const [selectedTeam, setSelectedTeam] = useState("");
 
   useEffect(() => {
     if (!companyCode) {
@@ -45,7 +45,7 @@ export default function DashboardPanel({ companyCode }) {
         setError("");
 
         const res = await fetch(
-          `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
+          `http://127.0.0.1:8787/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
         );
 
         const json = await res.json();
@@ -256,6 +256,8 @@ export default function DashboardPanel({ companyCode }) {
                 </button>
               ))}
             </div>
+
+          
           )}
 
           <Table>
@@ -278,6 +280,34 @@ export default function DashboardPanel({ companyCode }) {
           </Table>
         </CardContent>
       </Card>
+
+      <Card className="border-slate-200 bg-white">
+  <CardHeader>
+    <CardTitle className="text-slate-800">
+      企業コード内全体の個人発言量ランキング
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>順位</TableHead>
+          <TableHead>ユーザー</TableHead>
+          <TableHead className="text-right">文字数</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {globalUserData.map((u, i) => (
+          <TableRow key={u.name}>
+            <TableCell>{i + 1}</TableCell>
+            <TableCell>{u.name}</TableCell>
+            <TableCell className="text-right">{u.value}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </CardContent>
+</Card>
     </div>
   );
 }
