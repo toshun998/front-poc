@@ -193,3 +193,33 @@ export const getTeamMembers = async (teamName) => {
   return state.users || [];
 };
 
+// ==============================
+// 8. 俯瞰用ダッシュボードAPI
+// ==============================
+export const logMessageEvent = (payload) => post("/events/message", payload);
+
+export async function getDashboardSummary() {
+  const companyCode = getCompanyCode();
+
+  const res = await fetch(
+    `${BASE}/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`,
+    {
+      method: "GET",
+      headers,
+    }
+  );
+
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || `dashboard summary failed (${res.status})`);
+  }
+
+  return data;
+}

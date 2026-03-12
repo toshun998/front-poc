@@ -13,6 +13,7 @@ import {
   getTeamState,
   updateTeamMembers,
   getTeamMembers,
+  logMessageEvent,
 } from "../FrontServer/personaApi";
 
 // --- CSS ---
@@ -48,6 +49,7 @@ import IntroScreen from "./screens/IntroScreen";
 import FrontScreen from "./screens/FrontScreen";
 import LogScreen from "./screens/LogScreen";
 import BoardScreen from "./screens/BoardScreen";
+import DashboardPanel from "./components/DashboardPanel";
 
 // --- モーダルコンポーネント ---
 import SettingsModal from "./modals/SettingsModal";
@@ -315,72 +317,127 @@ export default function App() {
      コア関数
      ================================================================ */
 
-  // ── 送信ボタン ──
-  async function send() {
-    const any = [
+// ── 送信ボタン ──
+async function send() {
+  const any = [
+    premise, trouble, otherPrem, cause, idea,
+    who, what, how, good, bad,
+    ...plans.flatMap((p) => Object.values(p)),
+  ].some((v) => String(v || "").trim());
+
+  if (!any) { 
+    alert("どれか1つでいいので入力してください"); 
+    return; 
+  }
+  if (sending) return;
+  setSending(true);
+
+  try {
+    const signature = (idea || cause || premise || trouble || otherPrem || "").trim();
+    if (signature) histRef.current.push(signature);
+
+    const h = histRef.current;
+    if (h.length >= 3) {
+      const s1 = jaccard(h[h.length - 1], h[h.length - 2]);
+      const s2 = jaccard(h[h.length - 2], h[h.length - 3]);
+      if (s1 > 0.75 && s2 > 0.75) {
+        alert("これは外れ値だが：同じ調子が続いています。視点を1つ足して条件を変えてみよう。");
+      }
+    }
+
+    const fields = { premise, trouble, otherPrem, cause, idea };
+    const flagsDetail = {};
+    let allFlags = [];
+
+    try {
+      // チェックリスト方式：「不明」を除いた23種類のバイアスを個別にyes/noで判定
+      const biasTypesToCheck = OUTLIER_ORDER.filter((b) => b !== "不明");
+      const r = await checkLogBiasChecklist(topic, fields, biasTypesToCheck);
+
+      for (const [key, obj] of Object.entries(r.results || {})) {
+        flagsDetail[key] = obj.flags || [];
+        flagsDetail[`${key}_advice`] = obj.advice || "";
+        allFlags = allFlags.concat(obj.flags || []);
+      }
+    } catch (e) {
+      console.error("checkLogBiasChecklist error:", e);
+    }
+
+    const note = {
+      id: crypto.randomUUID(),
+      team: teamName,
+      userId: currentUserId,
+      q: topic || "（無題）",
+      stakeholder: selectedTarget || "（未選択）",
+      scenario: scenarioFixed ? scenario : "(未決定)",
+      premise,
+      trouble,
+      otherPrem,
+      cause,
+      idea,
+      plans,
+      createdAt: new Date().toISOString(),
+      flagsDetail,
+      allFlags,
+    };
+
+    // 文字数集計用：入力内容を全部つないでカウント
+    const textForCount = [
       premise, trouble, otherPrem, cause, idea,
       who, what, how, good, bad,
       ...plans.flatMap((p) => Object.values(p)),
-    ].some((v) => String(v || "").trim());
+    ]
+      .filter((v) => v != null && String(v).trim() !== "")
+      .join("\n");
 
-    if (!any) { alert("どれか1つでいいので入力してください"); return; }
-    if (sending) return;
-    setSending(true);
+    const charCount = textForCount.length;
 
+    await saveUserState({
+      team: teamName,
+      userId: currentUserId,
+      topic,
+      target: selectedTarget,
+      scenario: scenarioFixed ? scenario : null,
+      premise,
+      trouble,
+      otherPrem,
+      cause,
+      idea,
+      plans,
+      flagsDetail,
+      allFlags,
+      updatedAt: note.createdAt,
+    });
+
+    // ダッシュボード用イベントログ保存
+    // ここは失敗しても本体送信は成功扱いにする
     try {
-      const signature = (idea || cause || premise || trouble || otherPrem || "").trim();
-      if (signature) histRef.current.push(signature);
-      const h = histRef.current;
-      if (h.length >= 3) {
-        const s1 = jaccard(h[h.length - 1], h[h.length - 2]);
-        const s2 = jaccard(h[h.length - 2], h[h.length - 3]);
-        if (s1 > 0.75 && s2 > 0.75) {
-          alert("これは外れ値だが：同じ調子が続いています。視点を1つ足して条件を変えてみよう。");
-        }
-      }
-
-      const fields = { premise, trouble, otherPrem, cause, idea };
-      const flagsDetail = {};
-      let allFlags = [];
-      try {
-        // チェックリスト方式：「不明」を除いた23種類のバイアスを個別にyes/noで判定
-        const biasTypesToCheck = OUTLIER_ORDER.filter(b => b !== "不明");
-        const r = await checkLogBiasChecklist(topic, fields, biasTypesToCheck);
-        for (const [key, obj] of Object.entries(r.results || {})) {
-          flagsDetail[key] = obj.flags || [];
-          flagsDetail[`${key}_advice`] = obj.advice || "";
-          allFlags = allFlags.concat(obj.flags || []);
-        }
-      } catch (e) { console.error("checkLogBiasChecklist error:", e); }
-
-      const note = {
-        id: crypto.randomUUID(),
+      await logMessageEvent({
+        discussionId: topic || "default",
         team: teamName,
         userId: currentUserId,
-        q: topic || "（無題）",
-        stakeholder: selectedTarget || "（未選択）",
-        scenario: scenarioFixed ? scenario : "(未決定)",
-        premise, trouble, otherPrem, cause, idea, plans,
-        createdAt: new Date().toISOString(),
-        flagsDetail, allFlags,
-      };
-
-      await saveUserState({
-        team: teamName, userId: currentUserId,
-        topic, target: selectedTarget,
-        scenario: scenarioFixed ? scenario : null,
-        premise, trouble, otherPrem, cause, idea, plans,
-        flagsDetail, allFlags,
-        updatedAt: note.createdAt,
+        createdAt: note.createdAt,
+        charCount,
+        allFlags,
+        meta: {
+          topic: topic || "（無題）",
+          target: selectedTarget || "（未選択）",
+          scenario: scenarioFixed ? scenario : "(未決定)",
+        },
       });
+    } catch (e) {
+      console.error("logMessageEvent error:", e);
+    }
 
-      setNotes((n) => [note, ...n]);
-      setView("LOG");
-    } catch (err) {
-      console.error("send error:", err);
-      alert("送信中にエラーが発生しました");
-    } finally { setSending(false); }
+    setNotes((n) => [note, ...n]);
+    setView("LOG");
+  } catch (err) {
+    console.error("send error:", err);
+    alert("送信中にエラーが発生しました");
+  } finally {
+    setSending(false);
   }
+}
 
   // ── 盲点(Noise)を開く ──
   async function openNoise(note) {
@@ -678,6 +735,10 @@ export default function App() {
           openNoise={openNoise}
         />
       )}
+
+      {/* === Dashboard === */}
+      {view === "DASHBOARD" && <DashboardPanel companyCode="TEST" />}
+      
 
       {/* === BOARD === */}
       {view === "BOARD" && (

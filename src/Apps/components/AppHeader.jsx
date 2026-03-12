@@ -205,6 +205,13 @@ export default function AppHeader({
                             LOGを見る
                         </button>
 
+                        <button 
+                            className="btn"
+                            onClick={() => setView("DASHBOARD")}
+                        >
+                            Dashboard
+                        </button>
+
                         {/* LogViewerModal / DownloadSelectModal は children で渡される */}
                         {children}
 
@@ -260,6 +267,8 @@ export default function AppHeader({
                                 <option value="hard">Hard</option>
                             </select>
                         </div>
+
+                        
 
                         {/* AI接続 */}
                         <div
