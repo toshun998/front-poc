@@ -32,48 +32,45 @@ export default function DashboardPanel({ companyCode }) {
   const [selectedTeam, setSelectedTeam] = useState("");
 
   useEffect(() => {
-    if (!companyCode) {
-      setError("企業コードが見つかりません");
-      setData(null);
-      return;
-    }
+  let alive = true;
 
-    let alive = true;
+  async function load() {
+    try {
+      setError("");
 
-    async function load() {
-      try {
-        setError("");
+      const res = await fetch(
+        `http://127.0.0.1:8787/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
+      );
 
-        const res = await fetch(
-          `http://127.0.0.1:8787/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
-        );
+      const json = await res.json();
 
-        const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.error || "dashboard fetch failed");
+      }
 
-        if (!res.ok) {
-          throw new Error(json?.error || "dashboard fetch failed");
-        }
-
-        if (alive) {
-          setData(json);
-        }
-      } catch (e) {
-        console.error("dashboard fetch error:", e);
-        if (alive) {
-          setError(String(e));
-          setData(null);
-        }
+      if (alive) {
+        console.log("dashboard json:", json);
+        setData(json);
+      }
+    } catch (e) {
+      console.error("dashboard fetch error:", e);
+      if (alive) {
+        setError(String(e));
+        setData(null);
       }
     }
+  }
 
-    load(); // 初回は即時
-    const id = setInterval(load, 5 * 60 * 1000); // 5分ごと
+  if (!companyCode) return;
 
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, [companyCode]);
+  load(); // 初回
+  const timer = setInterval(load, 5000); // 5秒ごと更新
+
+  return () => {
+    alive = false;
+    clearInterval(timer);
+  };
+}, [companyCode]);
 
   const teamData = useMemo(() => {
     return Object.entries(data?.teamStats || {})
