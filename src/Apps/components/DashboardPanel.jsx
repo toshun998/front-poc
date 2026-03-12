@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Card,
@@ -23,128 +23,261 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  CartesianGrid,
 } from "recharts";
 
 export default function DashboardPanel({ companyCode }) {
   const [data, setData] = useState(null);
-const [error, setError] = useState("");
+  const [error, setError] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState("ALL");
 
-useEffect(() => {
-  async function load() {
-    try {
-      setError("");
-
-      const url = `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${companyCode}`;
-      console.log("dashboard fetch url:", url);
-
-      const res = await fetch(url);
-      console.log("dashboard status:", res.status);
-
-      const json = await res.json();
-      console.log("dashboard json:", json);
-
-      if (!res.ok) {
-        throw new Error(json?.error || "dashboard fetch failed");
-      }
-
-      setData(json);
-    } catch (e) {
-      console.error("dashboard fetch error:", e);
-      setError(String(e));
+  useEffect(() => {
+    if (!companyCode) {
+      setError("企業コードが見つかりません");
+      setData(null);
+      return;
     }
+
+    let alive = true;
+
+    async function load() {
+      try {
+        setError("");
+
+        const res = await fetch(
+          `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
+        );
+
+        const json = await res.json();
+
+        if (!res.ok) {
+          throw new Error(json?.error || "dashboard fetch failed");
+        }
+
+        if (alive) {
+          setData(json);
+        }
+      } catch (e) {
+        console.error("dashboard fetch error:", e);
+        if (alive) {
+          setError(String(e));
+          setData(null);
+        }
+      }
+    }
+
+    load(); // 初回は即時
+    const id = setInterval(load, 5 * 60 * 1000); // 5分ごと
+
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [companyCode]);
+
+  const teamData = useMemo(() => {
+    return Object.entries(data?.teamStats || {})
+      .map(([name, value]) => ({
+        name,
+        value,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [data]);
+
+  const biasData = useMemo(() => {
+    return Object.entries(data?.biasStats || {})
+      .map(([name, value]) => ({
+        name,
+        value,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [data]);
+
+  useEffect(() => {
+    if (!selectedTeam && teamData.length > 0) {
+      setSelectedTeam(teamData[0].name);
+    }
+  }, [teamData, selectedTeam]);
+
+  const userData = useMemo(() => {
+    return Object.entries(data?.userStatsByTeam?.[selectedTeam] || {})
+      .map(([name, value]) => ({
+        name,
+        value,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [data, selectedTeam]);
+
+  const globalUserData = useMemo(() => {
+  const map = {};
+
+  Object.values(data?.userStatsByTeam || {}).forEach(teamObj => {
+    Object.entries(teamObj).forEach(([user, count]) => {
+      map[user] = (map[user] || 0) + count;
+    });
+  });
+
+  return Object.entries(map)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
+}, [data]);
+
+  const totalChars = useMemo(() => {
+    return teamData.reduce((sum, row) => sum + row.value, 0);
+  }, [teamData]);
+
+  const totalUsers = useMemo(() => {
+    const set = new Set();
+    Object.values(data?.userStatsByTeam || {}).forEach((teamObj) => {
+      Object.keys(teamObj).forEach((user) => set.add(user));
+    });
+    return set.size;
+  }, [data]);
+
+  const totalBias = useMemo(() => {
+    return biasData.reduce((sum, row) => sum + row.value, 0);
+  }, [biasData]);
+
+  if (error) {
+    return (
+      <div className="p-6 text-red-500">
+        取得失敗: {error}
+      </div>
+    );
   }
 
-  load();
-
-  const id = setInterval(load, 300000); // 5分
-  return () => clearInterval(id);
-}, [companyCode]);
-
-if (error) {
-  return <div style={{ padding: 16, color: "red" }}>取得失敗: {error}</div>;
-}
-
-if (!data) {
-  return <div style={{ padding: 16 }}>読み込み中...</div>;
-}
-
-  const teamData = Object.entries(data.teamStats || {}).map(([k, v]) => ({
-    name: k,
-    value: v,
-  }));
-
-  const userData = Object.entries(data.userStats || {}).map(([k, v]) => ({
-    name: k,
-    value: v,
-  }));
-
-  const biasData = Object.entries(data.biasStats || {}).map(([k, v]) => ({
-    name: k,
-    value: v,
-  }));
+  if (!data) {
+    return (
+      <div className="p-6 text-slate-500">
+        ダッシュボードを読み込み中...
+      </div>
+    );
+  }
 
   return (
-    <div className="grid grid-cols-3 gap-6 p-6">
+    <div className="space-y-6 p-6 bg-slate-50 min-h-screen">
+      {/* KPI */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-sky-100 bg-sky-50">
+          <CardHeader>
+            <CardTitle className="text-sky-800">総発言文字数</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-sky-900">{totalChars}</div>
+          </CardContent>
+        </Card>
 
-      {/* チーム発言量 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>チーム発言量</CardTitle>
-        </CardHeader>
-        <CardContent style={{ height: 300 }}>
-          <ResponsiveContainer>
-            <BarChart data={teamData}>
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        <Card className="border-emerald-100 bg-emerald-50">
+          <CardHeader>
+            <CardTitle className="text-emerald-800">参加人数</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-emerald-900">{totalUsers}</div>
+          </CardContent>
+        </Card>
 
-      {/* 個人発言量 */}
-      <Card>
+        <Card className="border-cyan-100 bg-cyan-50">
+          <CardHeader>
+            <CardTitle className="text-cyan-800">検出バイアス総数</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-cyan-900">{totalBias}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 上段 */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-slate-200 bg-white">
+          <CardHeader>
+            <CardTitle className="text-slate-800">チーム別発言量</CardTitle>
+          </CardHeader>
+          <CardContent style={{ height: 320 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={teamData}
+                onClick={(state) => {
+                  if (state?.activeLabel) {
+                    setSelectedTeam(state.activeLabel);
+                  }
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="#60a5fa" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 bg-white">
+          <CardHeader>
+            <CardTitle className="text-slate-800">バイアス分布</CardTitle>
+          </CardHeader>
+          <CardContent style={{ height: 320 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={biasData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="#34d399" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 下段 */}
+      <Card className="border-slate-200 bg-white">
         <CardHeader>
-          <CardTitle>個人発言量</CardTitle>
+          <CardTitle className="text-slate-800">
+            個人発言量
+            {selectedTeam ? `（${selectedTeam}）` : ""}
+          </CardTitle>
         </CardHeader>
         <CardContent>
+          {teamData.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {teamData.map((team) => (
+                <button
+                  key={team.name}
+                  onClick={() => setSelectedTeam(team.name)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    selectedTeam === team.name
+                      ? "bg-sky-500 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {team.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>順位</TableHead>
                 <TableHead>ユーザー</TableHead>
-                <TableHead>文字数</TableHead>
+                <TableHead className="text-right">文字数</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {userData.map((u) => (
+              {userData.map((u, i) => (
                 <TableRow key={u.name}>
+                  <TableCell>{i + 1}</TableCell>
                   <TableCell>{u.name}</TableCell>
-                  <TableCell>{u.value}</TableCell>
+                  <TableCell className="text-right">{u.value}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {/* バイアス分布 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>バイアス分布</CardTitle>
-        </CardHeader>
-        <CardContent style={{ height: 300 }}>
-          <ResponsiveContainer>
-            <BarChart data={biasData}>
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
     </div>
   );
 }

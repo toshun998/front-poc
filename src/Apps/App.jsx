@@ -203,6 +203,7 @@ export default function App() {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserName, setCurrentUserName] = useState(null);
   const [step, setStep] = useState("join");
+  const currentCompanyCode = localStorage.getItem("companyCode") || "";
 
   // ── 名簿同期フック ──
   useRosterSync({
@@ -737,7 +738,12 @@ async function send() {
       )}
 
       {/* === Dashboard === */}
-      {view === "DASHBOARD" && <DashboardPanel companyCode="TEST" />}
+      {view === "DASHBOARD" && (
+        <DashboardPanel
+          key={currentCompanyCode}
+          companyCode={currentCompanyCode}
+        />
+      )}
       
 
       {/* === BOARD === */}
