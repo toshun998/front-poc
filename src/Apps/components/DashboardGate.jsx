@@ -5,9 +5,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "/Users/itsu1/dev/front-poc/src/Apps/shad_components/ui/card.jsx";
-import { Button } from "/Users/itsu1/dev/front-poc/src/Apps/shad_components/ui/button.jsx";
-import { Input } from "/Users/itsu1/dev/front-poc/src/Apps/shad_components/ui/input.jsx";
+} from "../shad_components/ui/card";
+import { Button } from "../shad_components/ui/button";
+import { Input } from "../shad_components/ui/input";
 
 export default function DashboardGate({
   companyCode,

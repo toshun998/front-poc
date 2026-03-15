@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import DashboardGate from "/Users/itsu1/dev/front-poc/src/Apps/components/DashboardGate.jsx";
+import DashboardGate from "./DashboardGate";
 
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-} from "/Users/itsu1/dev/front-poc/src/Apps/shad_components/ui/card.jsx";
+} from "../shad_components/ui/card";
 
 import {
   Table,
@@ -15,7 +15,7 @@ import {
   TableHead,
   TableRow,
   TableCell,
-} from "/Users/itsu1/dev/front-poc/src/Apps/shad_components/ui/table.jsx";
+} from "../shad_components/ui/table.jsx";
 
 import {
   ResponsiveContainer,
@@ -117,10 +117,10 @@ export default function DashboardPanel({ companyCode }) {
   }, [data, selectedTeam]);
 
   const globalUserData = useMemo(() => {
-    return Object.entries(map)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [data]);
+  return Object.entries(data?.overallUserStats || {})
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+}, [data]);
 
   const totalChars = data?.totalCharCount ?? 0;
 const totalUsers = data?.participantCount ?? 0;
