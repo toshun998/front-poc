@@ -33,7 +33,6 @@ export default function AppHeader({
     setGateLoading,
     setUserList,
     getTeamMembers,
-
     // AI接続
     aiOK,
     checkAI,

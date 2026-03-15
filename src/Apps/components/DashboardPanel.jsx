@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import DashboardGate from "/Users/itsu1/dev/front-poc/src/Apps/components/DashboardGate.jsx";
 
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-} from "../shad_components/ui/card";
+} from "/Users/itsu1/dev/front-poc/src/Apps/shad_components/ui/card.jsx";
 
 import {
   Table,
@@ -14,7 +15,7 @@ import {
   TableHead,
   TableRow,
   TableCell,
-} from "../shad_components/ui/table";
+} from "/Users/itsu1/dev/front-poc/src/Apps/shad_components/ui/table.jsx";
 
 import {
   ResponsiveContainer,
@@ -30,137 +31,140 @@ export default function DashboardPanel({ companyCode }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [selectedTeam, setSelectedTeam] = useState("");
+  const [dashboardUnlocked, setDashboardUnlocked] = useState(false);
+  const DASHBOARD_API_BASE = "https://ms-engine-test.s-yamane.workers.dev";
 
   useEffect(() => {
-  let alive = true;
+    const saved = localStorage.getItem("facilitatorKey");
+    if (saved) {
+      setDashboardUnlocked(true);
+    }
+  }, []);
 
-  async function load() {
-    try {
-      setError("");
+  useEffect(() => {
+    if (!companyCode || !dashboardUnlocked) return;
 
-      const facilitatorKey = localStorage.getItem("facilitatorKey") || "";
+    let alive = true;
 
-      const res = await fetch(
-        `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${facilitatorKey}`,
-          },
+    async function load() {
+      try {
+        setError("");
+
+        const facilitatorKey = localStorage.getItem("facilitatorKey") || "";
+
+        const res = await fetch(
+          `${DASHBOARD_API_BASE}/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${facilitatorKey}`,
+            },
+          }
+        );
+
+        const json = await res.json();
+
+        if (!res.ok) {
+          throw new Error(json?.error || "dashboard fetch failed");
         }
-      );
 
-      const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json?.error || "dashboard fetch failed");
-      }
-
-      if (alive) {
-        console.log("dashboard json:", json);
-        setData(json);
-      }
-    } catch (e) {
-      console.error("dashboard fetch error:", e);
-      if (alive) {
-        setError(String(e));
-        setData(null);
+        if (alive) {
+          console.log("dashboard json:", json);
+          setData(json);
+        }
+      } catch (e) {
+        console.error("dashboard fetch error:", e);
+        if (alive) {
+          setError(String(e));
+          setData(null);
+        }
       }
     }
-  }
 
-  if (!companyCode) return;
+    load();
+    const timer = setInterval(load, 5000);
 
-  load(); // 初回
-  const timer = setInterval(load, 5000); // 5秒ごと更新
-
-  return () => {
-    alive = false;
-    clearInterval(timer);
-  };
-}, [companyCode]);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [companyCode, dashboardUnlocked]);
 
   const teamData = useMemo(() => {
     return Object.entries(data?.teamStats || {})
-      .map(([name, value]) => ({
-        name,
-        value,
-      }))
+      .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [data]);
 
   const biasData = useMemo(() => {
     return Object.entries(data?.biasStats || {})
-      .map(([name, value]) => ({
-        name,
-        value,
-      }))
+      .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [data]);
 
   useEffect(() => {
-    if (!selectedTeam && teamData.length > 0) {
-      setSelectedTeam(teamData[0].name);
-    }
-  }, [teamData, selectedTeam]);
+  if (teamData.length === 0) return;
+
+  const exists = teamData.some((team) => team.name === selectedTeam);
+  if (!selectedTeam || !exists) {
+    setSelectedTeam(teamData[0].name);
+  }
+}, [teamData, selectedTeam]);
 
   const userData = useMemo(() => {
     return Object.entries(data?.userStatsByTeam?.[selectedTeam] || {})
-      .map(([name, value]) => ({
-        name,
-        value,
-      }))
+      .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [data, selectedTeam]);
 
   const globalUserData = useMemo(() => {
-  const map = {};
-
-  Object.values(data?.userStatsByTeam || {}).forEach(teamObj => {
-    Object.entries(teamObj).forEach(([user, count]) => {
-      map[user] = (map[user] || 0) + count;
-    });
-  });
-
-  return Object.entries(map)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-
-}, [data]);
-
-  const totalChars = useMemo(() => {
-    return teamData.reduce((sum, row) => sum + row.value, 0);
-  }, [teamData]);
-
-  const totalUsers = useMemo(() => {
-    const set = new Set();
-    Object.values(data?.userStatsByTeam || {}).forEach((teamObj) => {
-      Object.keys(teamObj).forEach((user) => set.add(user));
-    });
-    return set.size;
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
   }, [data]);
 
-  const totalBias = useMemo(() => {
-    return biasData.reduce((sum, row) => sum + row.value, 0);
-  }, [biasData]);
+  const totalChars = data?.totalCharCount ?? 0;
+const totalUsers = data?.participantCount ?? 0;
+const totalBias = useMemo(() => {
+  return Object.values(data?.biasStats || {}).reduce((sum, v) => sum + v, 0);
+}, [data]);
 
-  if (error) {
+  if (!dashboardUnlocked) {
     return (
-      <div className="p-6 text-red-500">
-        取得失敗: {error}
-      </div>
+      <DashboardGate
+        companyCode={companyCode}
+        dashboardUrlBase={DASHBOARD_API_BASE}
+        onUnlock={() => setDashboardUnlocked(true)}
+      />
     );
   }
 
+  if (error) {
+    return <div className="p-6 text-red-500">取得失敗: {error}</div>;
+  }
+
   if (!data) {
-    return (
-      <div className="p-6 text-slate-500">
-        ダッシュボードを読み込み中...
-      </div>
-    );
+    return <div className="p-6 text-slate-500">ダッシュボードを読み込み中...</div>;
   }
 
   return (
     <div className="space-y-6 p-6 bg-slate-50 min-h-screen">
+      <div className="flex items-center justify-between">
+  <h2 className="text-2xl font-bold text-slate-800">
+    ファシリテーターダッシュボード
+  </h2>
+
+  <button
+    onClick={() => {
+      localStorage.removeItem("facilitatorKey");
+      setDashboardUnlocked(false);
+      setData(null);
+      setError("");
+    }}
+    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
+  >
+    認証解除
+  </button>
+</div>
       {/* KPI */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-sky-100 bg-sky-50">
