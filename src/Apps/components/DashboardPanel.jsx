@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+<<<<<<< HEAD
 import DashboardGate from "./DashboardGate";
+=======
+import DashboardGate from  "./DashboardGate"
+>>>>>>> b5296dd (update front-poc)
 
 import {
   Card,
@@ -15,7 +19,11 @@ import {
   TableHead,
   TableRow,
   TableCell,
+<<<<<<< HEAD
 } from "../shad_components/ui/table.jsx";
+=======
+} from "../shad_components/ui/table";
+>>>>>>> b5296dd (update front-poc)
 
 import {
   ResponsiveContainer,
@@ -116,8 +124,8 @@ export default function DashboardPanel({ companyCode }) {
       .sort((a, b) => b.value - a.value);
   }, [data, selectedTeam]);
 
-  const globalUserData = useMemo(() => {
-  return Object.entries(data?.overallUserStats || {})
+const globalUserData = useMemo(() => {
+  return Object.entries(data?.globalUserStats || {})
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 }, [data]);
