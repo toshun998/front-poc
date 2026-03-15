@@ -38,7 +38,7 @@ export default function DashboardPanel({ companyCode }) {
     try {
       setError("");
 
-      const facilitatorKey = localStorage.getItem("facilitatorKey", "abc123") || "";
+      const facilitatorKey = localStorage.getItem("facilitatorKey") || "";
 
       const res = await fetch(
         `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`,
