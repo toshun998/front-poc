@@ -39,7 +39,7 @@ export default function DashboardPanel({ companyCode }) {
       setError("");
 
       const res = await fetch(
-        `http://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
+        `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
       );
 
       const json = await res.json();
