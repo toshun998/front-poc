@@ -33,9 +33,7 @@ export default function AppHeader({
     setGateLoading,
     setUserList,
     getTeamMembers,
-    // 難易度
-    ootbMode,
-    setOotbMode,
+
     // AI接続
     aiOK,
     checkAI,
@@ -255,18 +253,7 @@ export default function AppHeader({
                             設定変更
                         </button>
 
-                        {/* 難易度 */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span className="hint">難易度</span>
-                            <select
-                                value={ootbMode}
-                                onChange={(e) => setOotbMode(e.target.value)}
-                            >
-                                <option value="easy">Easy</option>
-                                <option value="standard">Standard</option>
-                                <option value="hard">Hard</option>
-                            </select>
-                        </div>
+
 
                         
 
