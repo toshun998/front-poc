@@ -38,8 +38,15 @@ export default function DashboardPanel({ companyCode }) {
     try {
       setError("");
 
+      const facilitatorKey = localStorage.getItem("facilitatorKey") || "";
+
       const res = await fetch(
-        `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`
+        `https://ms-engine-test.s-yamane.workers.dev/dashboard/summary?companyCode=${encodeURIComponent(companyCode)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${facilitatorKey}`,
+          },
+        }
       );
 
       const json = await res.json();
