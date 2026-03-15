@@ -62,7 +62,7 @@ export default function DashboardGate({
           <CardTitle className="text-2xl text-slate-800">
             ファシリテーター認証
           </CardTitle>
-          <CardDescription className="text-slate-500">
+          <CardDescription className="text-slate-950">
             ダッシュボードの閲覧には認証キーが必要です。
           </CardDescription>
         </CardHeader>
@@ -89,7 +89,7 @@ export default function DashboardGate({
             <Button
               onClick={handleUnlock}
               disabled={loading || !password}
-              className="flex-1"
+              className="flex-1 bg-sky-600 text-white hover:bg-sky-700 disabled:bg-slate-300 disabled:text-slate-600"
             >
               {loading ? "認証中..." : "認証して入る"}
             </Button>
