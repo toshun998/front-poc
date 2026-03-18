@@ -117,7 +117,7 @@ export default function DashboardPanel({ companyCode }) {
   }, [data, selectedTeam]);
 
 const globalUserData = useMemo(() => {
-  return Object.entries(data?.globalUserStats || {})
+  return Object.entries(data?.overallUserStats || {})
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 }, [data]);
