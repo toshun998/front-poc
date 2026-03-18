@@ -87,12 +87,22 @@ export const getTargets = (topic) =>
 // ==============================
 export const arrangeBoard = (arg1, spec, notes) => {
   if (Array.isArray(arg1)) {
-    return post("/persona/arrangeBoard", { boards: arg1 });
+    return post("/persona/arrangeBoard", {
+      boards: arg1,
+      spec,
+      notes,
+    });
   }
-  if (typeof arg1 === "object" && arg1.topic) {
+
+  if (arg1 && typeof arg1 === "object" && arg1.topic) {
     return post("/persona/arrangeBoard", arg1);
   }
-  return post("/persona/arrangeBoard", { topic: arg1, spec, notes });
+
+  return post("/persona/arrangeBoard", {
+    topic: arg1,
+    spec,
+    notes,
+  });
 };
 
 export const evidenceQuest = (topic, teamName, notes = []) =>

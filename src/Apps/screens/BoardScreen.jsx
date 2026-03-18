@@ -72,7 +72,9 @@ export default function BoardScreen({
             console.log("📤 sending payload:", payload);
 
             const r = await arrangeBoard(payload);
-            console.log("📥 arrangeBoard response:", r);
+            console.log("📥 arrangeBoard response raw:", JSON.stringify(r, null, 2));
+            console.log("📍 positions raw:", JSON.stringify(r?.results?.[0]?.positions || [], null, 2));
+            console.log("🧱 items:", items.map((it) => ({ key: it.key, title: it.title })));
 
             const positions = r?.results?.[0]?.positions || [];
             const mm = {};
@@ -86,14 +88,30 @@ export default function BoardScreen({
                 return;
             }
 
-            positions.forEach((p, i) => {
-                const it = items[i];
-                if (it) {
-                    mm[it.key] = {
-                        xP: Math.min(95, Math.max(5, p.xP ?? 50)),
-                        yP: Math.min(95, Math.max(5, p.yP ?? 50)),
-                    };
+            const itemMap = Object.fromEntries(items.map((it) => [it.key, it]));
+            const used = [];
+
+            function separatePosition(xP, yP) {
+                let x = xP;
+                let y = yP;
+
+                while (used.some((p) => Math.abs(p.x - x) < 8 && Math.abs(p.y - y) < 8)) {
+                    x = Math.min(95, x + 7);
+                    y = Math.min(95, y + 7);
                 }
+
+                used.push({ x, y });
+                return { xP: x, yP: y };
+            }
+
+            positions.forEach((p) => {
+                const it = itemMap[p.id];
+                if (!it) return;
+
+                const xP = Math.min(95, Math.max(5, p.xP ?? 50));
+                const yP = Math.min(95, Math.max(5, p.yP ?? 50));
+
+                mm[it.key] = separatePosition(xP, yP);
             });
 
             console.log("🧭 merged positions:", mm);
