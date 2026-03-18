@@ -249,7 +249,7 @@ const totalBias = useMemo(() => {
         </CardHeader>
         <CardContent>
           {teamData.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
+            <div className="mb-4 flex flex-wrap gap-2 text-[1.2rem]">
               {teamData.map((team) => (
                 <button
                   key={team.name}
@@ -301,7 +301,7 @@ const totalBias = useMemo(() => {
         <TableRow>
           <TableHead>順位</TableHead>
           <TableHead>ユーザー</TableHead>
-          <TableHead className="text-right">文字数</TableHead>
+          <TableHead className="text-right text-[1.2rem]">文字数</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -309,7 +309,7 @@ const totalBias = useMemo(() => {
           <TableRow key={u.name}>
             <TableCell>{i + 1}</TableCell>
             <TableCell>{u.name}</TableCell>
-            <TableCell className="text-right">{u.value}</TableCell>
+            <TableCell className="text-right text-[1.2rem]">{u.value}</TableCell>
           </TableRow>
         ))}
       </TableBody>
