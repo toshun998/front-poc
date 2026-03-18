@@ -271,9 +271,9 @@ const totalBias = useMemo(() => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>順位</TableHead>
-                <TableHead>ユーザー</TableHead>
-                <TableHead className="text-right">文字数</TableHead>
+                <TableHead className="text-[1.2rem]">順位</TableHead>
+                <TableHead className="text-[1.2rem]">ユーザー</TableHead>
+                <TableHead className="text-right text-[1.2rem]">文字数</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -281,7 +281,7 @@ const totalBias = useMemo(() => {
                 <TableRow key={u.name}>
                   <TableCell>{i + 1}</TableCell>
                   <TableCell>{u.name}</TableCell>
-                  <TableCell className="text-right">{u.value}</TableCell>
+                  <TableCell className="text-right text-[1.2rem]">{u.value}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -299,16 +299,16 @@ const totalBias = useMemo(() => {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>順位</TableHead>
-          <TableHead>ユーザー</TableHead>
+          <TableHead className="text-[1.2rem]">順位</TableHead>
+          <TableHead className="text-[1.2rem]">ユーザー</TableHead>
           <TableHead className="text-right text-[1.2rem]">文字数</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {globalUserData.map((u, i) => (
           <TableRow key={u.name}>
-            <TableCell>{i + 1}</TableCell>
-            <TableCell>{u.name}</TableCell>
+            <TableCell className="text-[1.2rem]">{i + 1}</TableCell>
+            <TableCell className="text-[1.2rem]">{u.name}</TableCell>
             <TableCell className="text-right text-[1.2rem]">{u.value}</TableCell>
           </TableRow>
         ))}
