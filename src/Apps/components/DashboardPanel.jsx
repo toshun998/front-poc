@@ -240,7 +240,7 @@ const totalBias = useMemo(() => {
       </div>
 
       {/* 下段 */}
-      <Card className="border-slate-200 bg-white text-[1.2rem]">
+      <Card className="border-slate-200 bg-white text-[1.6rem]">
         <CardHeader>
           <CardTitle className="text-slate-800">
             個人発言量
@@ -289,7 +289,7 @@ const totalBias = useMemo(() => {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white text-[1.2rem]">
+      <Card className="border-slate-200 bg-white text-[1.6rem]">
   <CardHeader>
     <CardTitle className="text-slate-800">
       企業コード内全体の個人発言量ランキング
