@@ -62,7 +62,15 @@ export function OutlierBadges({ flags = [] }) {
 export function RenderFlags({ flagsForField, rawText, field, advice, teamStats }) {
     if (!rawText || rawText.trim().length === 0) return null;
 
-    const filtered = filterOutlierFlags(flagsForField, field, rawText, teamStats);
+    // ★ 追加：必ず配列にする
+    const safeFlags = Array.isArray(flagsForField)
+        ? flagsForField
+        : flagsForField
+        ? [flagsForField]
+        : [];
+
+    const filtered = filterOutlierFlags(safeFlags, field, rawText, teamStats);
+
     const [open, setOpen] = useState(false);
 
     return (

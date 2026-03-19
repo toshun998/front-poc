@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import DashboardGate from "./DashboardGate";
+
+import DashboardGate from  "./DashboardGate"
+
 
 import {
   Card,
@@ -15,7 +17,9 @@ import {
   TableHead,
   TableRow,
   TableCell,
-} from "../shad_components/ui/table.jsx";
+
+} from "../shad_components/ui/table";
+
 
 import {
   ResponsiveContainer,
@@ -117,7 +121,7 @@ export default function DashboardPanel({ companyCode }) {
   }, [data, selectedTeam]);
 
 const globalUserData = useMemo(() => {
-  return Object.entries(data?.overallUserStats || {})
+  return Object.entries(data?.globalUserStats || {})
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 }, [data]);
@@ -241,52 +245,53 @@ const totalBias = useMemo(() => {
 
       {/* 下段 */}
       <Card className="border-slate-200 bg-white">
-  <CardHeader>
-    <CardTitle className="text-slate-800">
-      個人発言量（{selectedTeam}）
-    </CardTitle>
-  </CardHeader>
-  <CardContent>
-    {teamData.length > 0 && (
-      <div className="mb-4 flex flex-wrap gap-2">
-        {teamData.map((team) => (
-          <button
-            key={team.name}
-            onClick={() => setSelectedTeam(team.name)}
-            className={`rounded-md border px-4 py-2 text-base ${
-              selectedTeam === team.name
-                ? "bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-700"
-            }`}
-          >
-            {team.name}
-          </button>
-        ))}
-      </div>
-    )}
+        <CardHeader>
+          <CardTitle className="text-slate-800">
+            個人発言量
+            {selectedTeam ? `（${selectedTeam}）` : ""}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {teamData.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {teamData.map((team) => (
+                <button
+                  key={team.name}
+                  onClick={() => setSelectedTeam(team.name)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    selectedTeam === team.name
+                      ? "bg-sky-500 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {team.name}
+                </button>
+              ))}
+            </div>
 
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="text-[1.2rem]">順位</TableHead>
-          <TableHead className="text-[1.2rem]">ユーザー</TableHead>
-          <TableHead className="text-right text-[1.2rem]">文字数</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {userData.map((u, i) => (
-          <TableRow key={u.name}>
-            <TableCell className="text-[1.2rem]">{i + 1}</TableCell>
-            <TableCell className="text-[1.2rem]">{u.name}</TableCell>
-            <TableCell className="text-right text-[1.2rem]">
-              {u.value}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  </CardContent>
-</Card>
+          
+          )}
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>順位</TableHead>
+                <TableHead>ユーザー</TableHead>
+                <TableHead className="text-right">文字数</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {userData.map((u, i) => (
+                <TableRow key={u.name}>
+                  <TableCell>{i + 1}</TableCell>
+                  <TableCell>{u.name}</TableCell>
+                  <TableCell className="text-right">{u.value}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Card className="border-slate-200 bg-white">
   <CardHeader>
@@ -298,19 +303,17 @@ const totalBias = useMemo(() => {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="text-[1.2rem]">順位</TableHead>
-          <TableHead className="text-[1.2rem]">ユーザー</TableHead>
-          <TableHead className="text-right text-[1.2rem]">文字数</TableHead>
+          <TableHead>順位</TableHead>
+          <TableHead>ユーザー</TableHead>
+          <TableHead className="text-right">文字数</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {globalUserData.map((u, i) => (
           <TableRow key={u.name}>
-            <TableCell className="text-[1.2rem]">{i + 1}</TableCell>
-            <TableCell className="text-[1.2rem]">{u.name}</TableCell>
-            <TableCell className="text-right text-[1.2rem]">
-              {u.value}
-            </TableCell>
+            <TableCell>{i + 1}</TableCell>
+            <TableCell>{u.name}</TableCell>
+            <TableCell className="text-right">{u.value}</TableCell>
           </TableRow>
         ))}
       </TableBody>

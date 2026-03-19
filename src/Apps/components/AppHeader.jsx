@@ -256,25 +256,7 @@ export default function AppHeader({
 
                         
 
-                        {/* AI接続 */}
-                        <div
-                            className="hint"
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                marginLeft: 8,
-                            }}
-                        >
-                            AI: {aiOK == null ? "…" : aiOK ? "OK" : "NG"}
-                            <button
-                                className="btn"
-                                onClick={checkAI}
-                                style={{ padding: "4px 8px" }}
-                            >
-                                再検
-                            </button>
-                        </div>
+
 
                         {/* ナビ */}
                         <div

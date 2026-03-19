@@ -81,11 +81,11 @@ export default function LogScreen({
 
                             {/* 🧩 各セクション */}
                             {[
-                                ["前提", n.premise, "premise"],
                                 ["困っている具体例", n.trouble, "trouble"],
+                                ["前提の確認", n.premise, "premise"],
                                 ["他の前提", n.otherPrem, "otherPrem"],
-                                ["原因", n.cause, "cause"],
-                                ["対策アイデア", n.idea, "idea"],
+                                ["原因さがし", n.cause, "cause"],
+                                ["対策のアイデア", n.idea, "idea"],
                             ].map(([label, value, key]) =>
                                 value ? (
                                     <div
