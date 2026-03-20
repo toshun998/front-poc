@@ -72,7 +72,38 @@ export default function FrontScreen({
     // 送信
     send,
     sending,
+    
 }) {
+    // --- Page1 リセット ---
+const resetPage1 = () => {
+    const ok = window.confirm("Page1の入力内容をすべてリセットしますか？");
+    if (!ok) return;
+
+    setTopic("");
+    setSelectedTarget("");
+    setTargetList(defaultStakeholdersFor("")); // 初期状態に戻す
+    setAiMode(false);
+
+    setScenario("");
+    setScenarioDraft("");
+    setScenarioFixed(false);
+};
+
+// --- Page2 リセット ---
+const resetPage2 = () => {
+    const ok = window.confirm("Page2の入力内容をすべてリセットしますか？");
+    if (!ok) return;
+
+    setTrouble("");
+    setPremise("");
+    setOtherPrem("");
+    setCause("");
+    setIdea("");
+
+    setPlans([
+        { who: "", executor: "", what: "", how: "", good: "", bad: "" },
+    ]);
+};
     return (
         <main
             className="container"
@@ -103,7 +134,11 @@ export default function FrontScreen({
                     position: "relative",
                     zIndex: 1,
                 }}
+
+                
             >
+
+                
                 {page === 1 && (
                     <>
                         {/* Step 1: 議題 */}
@@ -341,11 +376,19 @@ export default function FrontScreen({
                             )}
                         </div>
 
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                            <button className="btnDark" onClick={() => setPage(2)}>
-                                次へ
-                            </button>
-                        </div>
+<div style={{ display: "flex", justifyContent: "space-between" }}>
+    <button
+        className="btn"
+        onClick={resetPage1}
+        style={{ background: "#fee2e2", color: "#b91c1c" }}
+    >
+        Page1リセット
+    </button>
+
+    <button className="btnDark" onClick={() => setPage(2)}>
+        次へ
+    </button>
+</div>
                     </>
                 )}
 
@@ -688,28 +731,42 @@ export default function FrontScreen({
                                 </div>
                             ))}
 
-                            <div
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    marginTop: 10,
-                                }}
-                            >
-                                <button
-                                    className="btn"
-                                    onClick={() => setPage(1)}
-                                    disabled={sending}
-                                >
-                                    戻る
-                                </button>
-                                <button
-                                    className="btnDark"
-                                    onClick={send}
-                                    disabled={sending}
-                                >
-                                    {sending ? "送信中..." : "送信"}
-                                </button>
-                            </div>
+<div
+    style={{
+        display: "flex",
+        justifyContent: "space-between",
+        marginTop: 10,
+    }}
+>
+    {/* 左：戻る＋リセット */}
+    <div style={{ display: "flex", gap: 8 }}>
+        <button
+            className="btn"
+            onClick={() => setPage(1)}
+            disabled={sending}
+        >
+            戻る
+        </button>
+
+        <button
+            className="btn"
+            onClick={resetPage2}
+            style={{ background: "#fee2e2", color: "#b91c1c" }}
+            disabled={sending}
+        >
+            Page2リセット
+        </button>
+    </div>
+
+    {/* 右：送信 */}
+    <button
+        className="btnDark"
+        onClick={send}
+        disabled={sending}
+    >
+        {sending ? "送信中..." : "送信"}
+    </button>
+</div>
                         </div>
 
                         {sending && <Spinner fullScreen size={180} />}
