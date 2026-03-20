@@ -717,6 +717,10 @@ async function send() {
         step={step} setStep={setStep}
         teamName={teamName} setTeamName={setTeamName}
         userList={userList} setUserList={setUserList}
+        currentUserId={currentUserId}
+        setCurrentUserId={setCurrentUserId}
+        currentUserName={currentUserName}
+        setCurrentUserName={setCurrentUserName}
       />
 
       {/* === LOGを見るモーダル === */}

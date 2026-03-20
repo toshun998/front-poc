@@ -15,6 +15,10 @@ export default function SettingsModal({
     setTeamName,
     userList,
     setUserList,
+    currentUserId,
+    setCurrentUserId,
+    currentUserName,
+    setCurrentUserName,
 }) {
 
     // ===== 新規追加 state =====
@@ -148,8 +152,7 @@ export default function SettingsModal({
 
                                 {/* ユーザー名一覧 */}
                                 {userList.map((u, i) => {
-                                    const isMe =
-                                        currentUserId && u.name && u.name === currentUserId;
+                                    const isMe = currentUserId && u.name && u.name === currentUserId;
 
                                     return (
                                         <div
