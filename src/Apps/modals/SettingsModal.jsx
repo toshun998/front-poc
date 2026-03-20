@@ -148,10 +148,6 @@ export default function SettingsModal({
 
                                 {/* ユーザー名一覧 */}
                                 {userList.map((u, i) => {
-
-                                    const currentUserId =
-                                        localStorage.getItem("currentUserId");
-
                                     const isMe =
                                         currentUserId && u.name && u.name === currentUserId;
 
@@ -241,8 +237,8 @@ export default function SettingsModal({
                                                     className="btn"
                                                     onClick={() =>
                                                         setUserList([
-                                                            ...userList,
-                                                            { name: "", removed: false },
+                                                        ...userList,
+                                                        { userId: "", name: "", removed: false },
                                                         ])
                                                     }
                                                     style={{ width: 36, height: 36 }}
@@ -281,13 +277,15 @@ export default function SettingsModal({
                                 <button
                                     className="btn"
                                     onClick={() => {
-                                        localStorage.removeItem("currentUserId");
-                                        localStorage.removeItem("currentUserName");
-                                        localStorage.removeItem("teamName");
-
+                                        setCurrentUserId(null);
+                                        setCurrentUserName(null);
                                         setTeamName("");
                                         setUserList([{ userId: "", name: "", removed: false }]);
                                         setStep("join");
+
+                                        localStorage.removeItem("currentUserId");
+                                        localStorage.removeItem("currentUserName");
+                                        localStorage.removeItem("teamName");
                                     }}
                                 >
                                     チームを抜ける

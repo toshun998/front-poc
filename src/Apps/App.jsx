@@ -75,7 +75,7 @@ export default function App() {
 
   // ── 入力フォーム ──
   const [topic, setTopic] = useState("");
-  const [teamName, setTeamName] = useState(() => localStorage.getItem("teamName") || "T1");
+  const [teamName, setTeamName] = useState(() => localStorage.getItem("teamName") || "");
   const [page, setPage] = useState(1);
   const [aiMode, setAiMode] = useState(false);
   const [targetList, setTargetList] = useState(defaultStakeholdersFor(""));
@@ -220,6 +220,16 @@ const [step, setStep] = useState(() => {
   return savedUserId && savedTeamName ? "front" : "join";
 });
 const currentCompanyCode = localStorage.getItem("companyCode") || "";
+  // ── step / 参加状態デバッグ ──
+  useEffect(() => {
+    console.log("[debug:step/state]", {
+      step,
+      teamName,
+      currentUserId,
+      currentUserName,
+      view,
+    });
+  }, [step, teamName, currentUserId, currentUserName, view]);
   // ── 名簿同期フック ──
   useRosterSync({
     teamName, currentUserId, gateOpen, step, userList,
@@ -271,7 +281,29 @@ const currentCompanyCode = localStorage.getItem("companyCode") || "";
   }, []);
 
   // ── localStorage同期 ──
-  useEffect(() => { localStorage.setItem("teamName", teamName); }, [teamName]);
+  useEffect(() => {
+    if (teamName) {
+      localStorage.setItem("teamName", teamName);
+    } else {
+      localStorage.removeItem("teamName");
+    }
+  }, [teamName]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      localStorage.setItem("currentUserId", currentUserId);
+    } else {
+      localStorage.removeItem("currentUserId");
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (currentUserName) {
+      localStorage.setItem("currentUserName", currentUserName);
+    } else {
+      localStorage.removeItem("currentUserName");
+    }
+  }, [currentUserName]);
 
   // ── イントロアニメーション ──
   useEffect(() => {
@@ -567,7 +599,13 @@ async function send() {
       const json = await res.json();
       alert(`チーム ${teamName} を削除しました（${json.deleted}件）`);
       setUserLogs([]); setSelectedLog(null); setLogOpen(false);
+      setTeamName("");
+      setCurrentUserId(null);
+      setCurrentUserName(null);
+      setStep("join");
       localStorage.removeItem("teamName");
+      localStorage.removeItem("currentUserId");
+      localStorage.removeItem("currentUserName");
     } catch (e) { console.error(e); alert("削除に失敗しました"); }
   }
 
@@ -613,7 +651,7 @@ async function send() {
   }
 
   // ── ログPDF用ペイロード ──
-  const displayName = localStorage.getItem("currentUserName") || "—";
+  const displayName = currentUserName || "—";
   const logPayload = {
     meta: { team: teamName, user: displayName, date: new Date().toLocaleString("ja-JP") },
     state: { topic, target: selectedTarget, scenario, premise, trouble, otherPrem, cause, idea, plans },
@@ -627,6 +665,25 @@ async function send() {
 
   return (
     <>
+      {/* === debug: step表示 === */}
+      <div
+        style={{
+          position: "fixed",
+          top: 10,
+          right: 10,
+          zIndex: 9999,
+          padding: "6px 10px",
+          borderRadius: 8,
+          background: "rgba(255,255,255,0.92)",
+          border: "1px solid #cbd5e1",
+          fontSize: 12,
+          color: "#0f172a",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        }}
+      >
+        step: {step} / team: {teamName || "—"} / user: {currentUserName || "—"}
+      </div>
+
       {/* === INTRO === */}
       {view === "INTRO" && (
         <IntroScreen stage={stage} setView={setView} setGateOpen={setGateOpen} />

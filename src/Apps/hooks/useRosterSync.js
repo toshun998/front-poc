@@ -47,7 +47,6 @@ export function useRosterSync({
     const progressRef = useRef({});
     const saveTimeoutRef = useRef(null);
 
-    // URLパラメータからの初期化
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const team = params.get("team");
@@ -58,10 +57,6 @@ export function useRosterSync({
         setTeamName(team);
         setCurrentUserId(userId);
         setCurrentUserName(userId);
-
-        localStorage.setItem("teamName", team);
-        localStorage.setItem("currentUserId", userId);
-        localStorage.setItem("currentUserName", userId);
 
         console.log("👤 個人ページ初期化:", { team, userId });
 
@@ -85,6 +80,9 @@ export function useRosterSync({
     // KVから名簿初期化
     useEffect(() => {
         const savedTeam = localStorage.getItem("teamName");
+        const savedUserId = localStorage.getItem("currentUserId");
+        const savedUserName = localStorage.getItem("currentUserName");
+
         if (!savedTeam) {
             setStep("join");
             return;
@@ -96,8 +94,19 @@ export function useRosterSync({
 
                 if (Array.isArray(savedMembers) && savedMembers.length > 0) {
                     setTeamName(savedTeam);
-                    setUserList(savedMembers.map((name) => ({ name, removed: false })));
-                    setStep("roster");
+                    setUserList(
+                        savedMembers.map((name) => ({
+                            userId: name,
+                            name,
+                            removed: false,
+                        }))
+                    );
+
+                    if (savedUserId && savedUserName) {
+                        setStep("front");
+                    } else {
+                        setStep("roster");
+                    }
                 } else {
                     setStep("join");
                 }
