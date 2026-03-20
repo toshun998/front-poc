@@ -69,11 +69,14 @@ export function exportLogPdf(payload = {}) {
     yRef.y += 3;
 
     writeLine(pdf, "【思考整理】", yRef, 12);
-    writeLine(pdf, `前提：${state.premise ?? "—"}`, yRef, 11, VALUE_X);
     writeLine(pdf, `困りごと：${state.trouble ?? "—"}`, yRef, 11, VALUE_X);
+    writeLine(pdf, `前提：${state.premise ?? "—"}`, yRef, 11, VALUE_X);
     writeLine(pdf, `他の前提：${state.otherPrem ?? "—"}`, yRef, 11, VALUE_X);
     writeLine(pdf, `原因：${state.cause ?? "—"}`, yRef, 11, VALUE_X);
     writeLine(pdf, `対策：${state.idea ?? "—"}`, yRef, 11, VALUE_X);
+
+    // 👇ここを変更🔥（見出しじゃなく1行形式）
+    writeLine(pdf, `自由記述：${state.freeNote ?? "—"}`, yRef, 11, VALUE_X);
 
     pdf.addPage();
     yRef.y = 15;
@@ -146,6 +149,7 @@ export function downloadAllLogsAsPDF(userLogs, teamName) {
             ["他の前提", log.otherPrem],
             ["原因", log.cause],
             ["対策", log.idea],
+            ["自由記述", log.freeNote], // ←追加🔥
         ];
 
         baseFields.forEach(([label, value]) => {
@@ -205,6 +209,7 @@ export function downloadAllLogsAsCSV(userLogs, teamName) {
         ["他の前提", "otherPrem"],
         ["原因", "cause"],
         ["対策", "idea"],
+        ["自由記述", "freeNote"], // ←追加🔥
     ];
 
     baseFields.forEach(([label, key]) => {

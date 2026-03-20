@@ -4,7 +4,7 @@ import MicButton from "../components/MicButton";
 import Spinner from "../components/Spinner";
 import { defaultStakeholdersFor } from "../utils/helpers";
 import { getTargets } from "../../FrontServer/personaApi";
-
+import { useState } from "react";
 /**
  * FRONT画面 - メインの入力フォーム（page1 + page2）
  */
@@ -48,6 +48,8 @@ export default function FrontScreen({
     setCause,
     idea,
     setIdea,
+    freeNote,
+    setFreeNote,
     // 音声入力（各フィールド）
     premiseListening,
     startPremiseListening,
@@ -72,8 +74,47 @@ export default function FrontScreen({
     // 送信
     send,
     sending,
+
     
 }) {
+        // 自由記述
+
+    const [freeNoteListening, setFreeNoteListening] = useState(false);
+    const startFreeNoteListening = () => {
+    try {
+        const SpeechRecognition =
+            window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            alert("このブラウザは音声入力に対応していません");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = "ja-JP";
+        recognition.interimResults = false;
+
+        setFreeNoteListening(true);
+
+        recognition.start();
+
+        recognition.onresult = (event) => {
+            const text = event.results[0][0].transcript;
+            setFreeNote((prev) => prev + text); // ←追記型🔥
+        };
+
+        recognition.onend = () => {
+            setFreeNoteListening(false);
+        };
+
+        recognition.onerror = () => {
+            setFreeNoteListening(false);
+        };
+    } catch (e) {
+        console.error(e);
+        setFreeNoteListening(false);
+    }
+};
     // --- Page1 リセット ---
 const resetPage1 = () => {
     const ok = window.confirm("Page1の入力内容をすべてリセットしますか？");
@@ -99,6 +140,7 @@ const resetPage2 = () => {
     setOtherPrem("");
     setCause("");
     setIdea("");
+    setFreeNote(""); // ← これ追加🔥
 
     setPlans([
         { who: "", executor: "", what: "", how: "", good: "", bad: "" },
@@ -435,6 +477,17 @@ const resetPage2 = () => {
                                     mic: { listening: ideaListening, start: startIdeaListening },
                                     placeholder: "解決のためにできることは？",
                                 },
+                                
+                                    
+   {
+    label: "自由記述（その他気づいたこと・補足など）",
+    value: freeNote,
+    setValue: setFreeNote,
+    mic: { listening: freeNoteListening, start: startFreeNoteListening },
+    placeholder: "なんでも自由に書いてOK",
+},
+
+
                             ].map(({ label, value, setValue, mic, placeholder }) => (
                                 <div key={label}>
                                     <div
