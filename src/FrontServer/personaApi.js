@@ -166,14 +166,15 @@ export const saveUserState = async (payload) => {
 };
 
 
-export const updateTeamMembers = async ({ team, members }) => {
-  if (!team || !Array.isArray(members)) {
+export const updateTeamMembers = async ({ companyCode, team, members }) => {
+  if (!companyCode || !team || !Array.isArray(members)) {
     throw new Error("invalid updateTeamMembers args");
   }
 
   return post("/team/updateMembers", {
+    companyCode,
     team,
-    members, // string[]（確定名簿）
+    members,
   });
 };
 // ==============================

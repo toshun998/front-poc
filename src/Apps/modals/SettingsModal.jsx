@@ -309,6 +309,13 @@ export default function SettingsModal({
                                                 .map((u) => u.name.trim());
 
                                             await updateTeamMembers({
+                                                companyCode: currentCompanyCode,
+                                                team: teamName,
+                                                members: activeMembers,
+                                            });
+
+                                            console.log("updateTeamMembers payload", {
+                                                companyCode: currentCompanyCode,
                                                 team: teamName,
                                                 members: activeMembers,
                                             });
@@ -398,13 +405,23 @@ export default function SettingsModal({
                                         : [...existingMembers, uid];
 
                                     try {
+                                        console.log("activeMembers before save", activeMembers);
+                                        console.log("teamName before save", teamName);
+                                        console.log("currentCompanyCode before save", currentCompanyCode);
 
                                         await updateTeamMembers({
+                                            companyCode: currentCompanyCode,
                                             team: teamName,
                                             members: activeMembers,
                                         });
 
                                         joinUser(uid);
+
+                                        console.log("updateTeamMembers payload", {
+                                            companyCode: currentCompanyCode,
+                                            team: teamName,
+                                            members: activeMembers,
+                                        });
 
                                     } catch (err) {
                                         console.error(err);
