@@ -186,25 +186,40 @@ export default function App() {
     return { H, E };
   }, [visibleNotes]);
 
-  // ── ユーザー / 参加設定 ──
-  const [userList, setUserList] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("userList"));
-      if (Array.isArray(saved) && saved.length > 0) {
-        return saved.map((u) =>
-          typeof u === "string"
-            ? { userId: u, name: u, removed: false }
-            : { userId: u.userId || u.name || "", name: u.name || u.userId || "", removed: !!u.removed }
-        );
-      }
-      return [{ userId: "", name: "", removed: false }];
-    } catch { return [{ userId: "", name: "", removed: false }]; }
-  });
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [currentUserName, setCurrentUserName] = useState(null);
-  const [step, setStep] = useState("join");
-  const currentCompanyCode = localStorage.getItem("companyCode") || "";
+// ── ユーザー / 参加設定 ──
+const [userList, setUserList] = useState(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem("userList"));
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved.map((u) =>
+        typeof u === "string"
+          ? { userId: u, name: u, removed: false }
+          : {
+              userId: u.userId || u.name || "",
+              name: u.name || u.userId || "",
+              removed: !!u.removed,
+            }
+      );
+    }
+    return [{ userId: "", name: "", removed: false }];
+  } catch {
+    return [{ userId: "", name: "", removed: false }];
+  }
+});
 
+const [currentUserId, setCurrentUserId] = useState(
+  () => localStorage.getItem("currentUserId") || null
+);
+const [currentUserName, setCurrentUserName] = useState(
+  () => localStorage.getItem("currentUserName") || null
+);
+
+const [step, setStep] = useState(() => {
+  const savedUserId = localStorage.getItem("currentUserId");
+  const savedTeamName = localStorage.getItem("teamName");
+  return savedUserId && savedTeamName ? "front" : "join";
+});
+const currentCompanyCode = localStorage.getItem("companyCode") || "";
   // ── 名簿同期フック ──
   useRosterSync({
     teamName, currentUserId, gateOpen, step, userList,

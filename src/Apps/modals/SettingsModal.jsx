@@ -28,6 +28,10 @@ export default function SettingsModal({
         localStorage.setItem("currentUserId", uid);
         localStorage.setItem("teamName", teamName);
 
+        setCurrentUserId(uid);
+        setCurrentUserName(uid);
+        setStep("front"); // ← 実際の遷移先に合わせて変更
+
         const url =
             `${window.location.origin}` +
             `/?team=${encodeURIComponent(teamName)}` +
@@ -282,7 +286,7 @@ export default function SettingsModal({
                                         localStorage.removeItem("teamName");
 
                                         setTeamName("");
-                                        setUserList([{ name: "", removed: false }]);
+                                        setUserList([{ userId: "", name: "", removed: false }]);
                                         setStep("join");
                                     }}
                                 >
