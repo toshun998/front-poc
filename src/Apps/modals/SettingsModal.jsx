@@ -189,16 +189,11 @@ export default function SettingsModal({
 
                                                         const uid = u.name.trim();
 
-                                                        const alreadyMember =
-                                                            userList.filter(
-                                                                (m) => !m.removed && m.name.trim()
-                                                            ).map(
-                                                                (m) => m.name.trim()
-                                                            ).filter(
-                                                                (name) => name === uid
-                                                            ).length > 1;
+                                                        const existsInRoster = userList.some(
+                                                            (m) => !m.removed && m.name.trim() === uid
+                                                        );
 
-                                                        if (!alreadyMember) {
+                                                        if (!existsInRoster) {
                                                             setPendingUser(uid);
                                                             setConsentChecked(false);
                                                             setShowConsent(true);
@@ -394,12 +389,13 @@ export default function SettingsModal({
 
                                     const uid = pendingUser;
 
-                                    const activeMembers = [
-                                        ...userList
-                                            .filter((u) => !u.removed && u.name.trim())
-                                            .map((u) => u.name.trim()),
-                                        uid,
-                                    ];
+                                    const existingMembers = userList
+                                        .filter((u) => !u.removed && u.name.trim())
+                                        .map((u) => u.name.trim());
+
+                                    const activeMembers = existingMembers.includes(uid)
+                                        ? existingMembers
+                                        : [...existingMembers, uid];
 
                                     try {
 
