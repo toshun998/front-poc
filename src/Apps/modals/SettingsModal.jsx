@@ -15,6 +15,7 @@ export default function SettingsModal({
     setTeamName,
     userList,
     setUserList,
+    currentCompanyCode,
     currentUserId,
     setCurrentUserId,
     currentUserName,
@@ -25,6 +26,7 @@ export default function SettingsModal({
     const [showConsent, setShowConsent] = useState(false);
     const [consentChecked, setConsentChecked] = useState(false);
     const [pendingUser, setPendingUser] = useState(null);
+    const [confirmedMembers, setConfirmedMembers] = useState([]);
 
     // ===== 参加処理 =====
     const joinUser = (uid) => {
@@ -100,18 +102,19 @@ export default function SettingsModal({
                                         }
 
                                         try {
-                                            const savedMembers = await getTeamMembers(teamName);
+                                            const savedMembers = await getTeamMembers(savedTeam);
 
-                                            if (
-                                                Array.isArray(savedMembers) &&
-                                                savedMembers.length > 0
-                                            ) {
+                                            if (Array.isArray(savedMembers) && savedMembers.length > 0) {
+                                                setTeamName(savedTeam);
+                                                setConfirmedMembers(savedMembers);
                                                 setUserList(
-                                                    savedMembers.map((name) => ({
-                                                        name,
-                                                        removed: false,
-                                                    }))
-                                                );
+                                                savedMembers.map((name) => ({
+                                                    userId: name,
+                                                    name,
+                                                    removed: false,
+                                                }))
+                                            );
+                                                setStep(savedUserId && savedUserName ? "front" : "roster");
                                             } else {
                                                 setUserList([{ name: "", removed: false }]);
                                             }
@@ -189,9 +192,7 @@ export default function SettingsModal({
 
                                                         const uid = u.name.trim();
 
-                                                        const existsInRoster = userList.some(
-                                                            (m) => !m.removed && m.name.trim() === uid
-                                                        );
+                                                        const existsInRoster = confirmedMembers.includes(uid);
 
                                                         if (!existsInRoster) {
                                                             setPendingUser(uid);
