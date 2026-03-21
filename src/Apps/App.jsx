@@ -398,38 +398,44 @@ async function send() {
     const fields = { premise, trouble, otherPrem, cause, idea };
     const flagsDetail = {};
     let allFlags = [];
+    const results = {}; // ← 追加
 
-    try {
-      const biasTypesToCheck = OUTLIER_ORDER.filter((b) => b !== "不明");
-      const r = await checkLogBiasChecklist(topic, fields, biasTypesToCheck);
+try {
+  const biasTypesToCheck = OUTLIER_ORDER.filter((b) => b !== "不明");
+  console.log("🚀 checkLogBiasChecklist 開始", { topic, fields, biasTypesToCheck });
+  const r = await checkLogBiasChecklist(topic, fields, biasTypesToCheck);
+  console.log("✅ レスポンス:", JSON.stringify(r, null, 2));
 
-      for (const [key, obj] of Object.entries(r.results || {})) {
-        flagsDetail[key] = obj.flags || [];
-        flagsDetail[`${key}_advice`] = obj.advice || "";
-        allFlags = allFlags.concat(obj.flags || []);
-      }
-    } catch (e) {
-      console.error("checkLogBiasChecklist error:", e);
-    }
+  for (const [key, obj] of Object.entries(r.results || {})) {
+    const fallacy = obj.fallacy && obj.fallacy !== "none" ? [obj.fallacy] : [];
+    flagsDetail[key] = fallacy;
+    flagsDetail[`${key}_advice`] = obj.advice || "";
+    allFlags = allFlags.concat(fallacy);
+    results[key] = { advice: obj.advice || "", fallacy: obj.fallacy || "" };
+  }
+} catch (e) {
+  console.error("❌ checkLogBiasChecklist error:", e);
+}
 
-    const note = {
-      id: crypto.randomUUID(),
-      team: teamName,
-      userId: currentUserId,
-      q: topic || "（無題）",
-      stakeholder: selectedTarget || "（未選択）",
-      scenario: scenarioFixed ? scenario : "(未決定)",
-      premise,
-      trouble,
-      otherPrem,
-      cause,
-      idea,
-      freeNote, // ←追加🔥（保存）
-      plans,
-      createdAt: new Date().toISOString(),
-      flagsDetail,
-      allFlags,
-    };
+const note = {
+  id: crypto.randomUUID(),
+  team: teamName,
+  userId: currentUserId,
+  q: topic || "（無題）",
+  stakeholder: selectedTarget || "（未選択）",
+  scenario: scenarioFixed ? scenario : "(未決定)",
+  premise,
+  trouble,
+  otherPrem,
+  cause,
+  idea,
+  freeNote,
+  plans,
+  createdAt: new Date().toISOString(),
+  flagsDetail,
+  allFlags,
+  results, // ← 追加
+};
 
     const textForCount = [
       premise, trouble, otherPrem, cause, idea,

@@ -41,7 +41,7 @@ export default function LogScreen({
                 </div>
 
                 <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                    {visibleNotes.map((n) => (
+{visibleNotes.filter(n => n.flagsDetail).map((n) => (
                         <li
                             key={n.id}
                             style={{
@@ -106,16 +106,20 @@ export default function LogScreen({
                                         </div>
 
                                         <div style={{ marginTop: 4 }}>
-                                            <RenderFlags
-                                                flagsForField={n.flagsDetail?.[key]}
-                                                rawText={toText(value)}
-                                                field={key}
-                                                advice={toText(n.flagsDetail?.[`${key}_advice`])}
-                                                teamStats={teamStats}
-                                            />
+
+<RenderFlags
+  flagsForField={n.flagsDetail?.[key]}
+  rawText={toText(value)}
+  field={key}
+  advice={toText(n.results?.[key]?.advice)}
+  teamStats={teamStats}
+/>
+                                   
                                         </div>
+                                        
                                     </div>
                                 ) : null
+                                
                             )}
 
                             {/* 📘 計画と実行 */}
