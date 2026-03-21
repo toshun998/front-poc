@@ -96,7 +96,8 @@ export default function App() {
   const [plans, setPlans] = useState([
     { who: "", what: "", how: "", good: "", bad: "" },
   ]);
-
+const [freeNote, setFreeNote] = useState("");
+const [freeNoteListening, setFreeNoteListening] = useState(false);
   // ── UI制御 ──
   const [headerOpen, setHeaderOpen] = useState(true);
   const [gateOpen, setGateOpen] = useState(false);
@@ -369,6 +370,7 @@ const currentCompanyCode = localStorage.getItem("companyCode") || "";
 async function send() {
   const any = [
     premise, trouble, otherPrem, cause, idea,
+    freeNote, // ←追加🔥（入力チェック）
     who, what, how, good, bad,
     ...plans.flatMap((p) => Object.values(p)),
   ].some((v) => String(v || "").trim());
@@ -398,7 +400,6 @@ async function send() {
     let allFlags = [];
 
     try {
-      // チェックリスト方式：「不明」を除いた23種類のバイアスを個別にyes/noで判定
       const biasTypesToCheck = OUTLIER_ORDER.filter((b) => b !== "不明");
       const r = await checkLogBiasChecklist(topic, fields, biasTypesToCheck);
 
@@ -423,15 +424,16 @@ async function send() {
       otherPrem,
       cause,
       idea,
+      freeNote, // ←追加🔥（保存）
       plans,
       createdAt: new Date().toISOString(),
       flagsDetail,
       allFlags,
     };
 
-    // 文字数集計用：入力内容を全部つないでカウント
     const textForCount = [
       premise, trouble, otherPrem, cause, idea,
+      freeNote, // ←追加🔥（文字数）
       who, what, how, good, bad,
       ...plans.flatMap((p) => Object.values(p)),
     ]
@@ -451,14 +453,13 @@ async function send() {
       otherPrem,
       cause,
       idea,
+      freeNote, // ←追加🔥（KV保存）
       plans,
       flagsDetail,
       allFlags,
       updatedAt: note.createdAt,
     });
 
-    // ダッシュボード用イベントログ保存
-    // ここは失敗しても本体送信は成功扱いにする
     try {
       await logMessageEvent({
         discussionId: topic || "default",
@@ -652,10 +653,25 @@ async function send() {
 
   // ── ログPDF用ペイロード ──
   const displayName = currentUserName || "—";
-  const logPayload = {
-    meta: { team: teamName, user: displayName, date: new Date().toLocaleString("ja-JP") },
-    state: { topic, target: selectedTarget, scenario, premise, trouble, otherPrem, cause, idea, plans },
-  };
+const logPayload = {
+  meta: { 
+    team: teamName, 
+    user: displayName, 
+    date: new Date().toLocaleString("ja-JP") 
+  },
+  state: { 
+    topic, 
+    target: selectedTarget, 
+    scenario, 
+    premise, 
+    trouble, 
+    otherPrem, 
+    cause, 
+    idea,
+    freeNote, // ←追加🔥
+    plans 
+  },
+};
 
   /* ================================================================
      レンダー
@@ -771,38 +787,44 @@ async function send() {
       />
 
       {/* === FRONT === */}
-      {view === "FRONT" && (
-        <FrontScreen
-          page={page} setPage={setPage}
-          topic={topic} setTopic={setTopic}
-          listening={listening} startListening={startListening}
-          targetList={targetList} setTargetList={setTargetList}
-          selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget}
-          targetListening={targetListening} startTargetListening={startTargetListening}
-          loadingTargets={loadingTargets} setLoadingTargets={setLoadingTargets}
-          aiMode={aiMode} setAiMode={setAiMode}
-          scenario={scenario} setScenario={setScenario}
-          scenarioDraft={scenarioDraft} setScenarioDraft={setScenarioDraft}
-          scenarioFixed={scenarioFixed} setScenarioFixed={setScenarioFixed}
-          scenarioListening={scenarioListening} startScenarioListening={startScenarioListening}
-          premise={premise} setPremise={setPremise}
-          trouble={trouble} setTrouble={setTrouble}
-          otherPrem={otherPrem} setOtherPrem={setOtherPrem}
-          cause={cause} setCause={setCause}
-          idea={idea} setIdea={setIdea}
-          premiseListening={premiseListening} startPremiseListening={startPremiseListening}
-          troubleListening={troubleListening} startTroubleListening={startTroubleListening}
-          otherPremListening={otherPremListening} startOtherPremListening={startOtherPremListening}
-          causeListening={causeListening} startCauseListening={startCauseListening}
-          ideaListening={ideaListening} startIdeaListening={startIdeaListening}
-          plans={plans} setPlans={setPlans}
-          listeningPlan={listeningPlan} startPlanListening={startPlanListening}
-          goodListening={goodListening} startGoodListening={startGoodListening}
-          badListening={badListening} startBadListening={startBadListening}
-          userList={userList}
-          send={send} sending={sending}
-        />
-      )}
+{view === "FRONT" && (
+  <FrontScreen
+    page={page} setPage={setPage}
+    topic={topic} setTopic={setTopic}
+    listening={listening} startListening={startListening}
+    targetList={targetList} setTargetList={setTargetList}
+    selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget}
+    targetListening={targetListening} startTargetListening={startTargetListening}
+    loadingTargets={loadingTargets} setLoadingTargets={setLoadingTargets}
+    aiMode={aiMode} setAiMode={setAiMode}
+    scenario={scenario} setScenario={setScenario}
+    scenarioDraft={scenarioDraft} setScenarioDraft={setScenarioDraft}
+    scenarioFixed={scenarioFixed} setScenarioFixed={setScenarioFixed}
+    scenarioListening={scenarioListening} startScenarioListening={startScenarioListening}
+    premise={premise} setPremise={setPremise}
+    trouble={trouble} setTrouble={setTrouble}
+    otherPrem={otherPrem} setOtherPrem={setOtherPrem}
+    cause={cause} setCause={setCause}
+    idea={idea} setIdea={setIdea}
+    premiseListening={premiseListening} startPremiseListening={startPremiseListening}
+    troubleListening={troubleListening} startTroubleListening={startTroubleListening}
+    otherPremListening={otherPremListening} startOtherPremListening={startOtherPremListening}
+    causeListening={causeListening} startCauseListening={startCauseListening}
+    ideaListening={ideaListening} startIdeaListening={startIdeaListening}
+    plans={plans} setPlans={setPlans}
+    listeningPlan={listeningPlan} startPlanListening={startPlanListening}
+    goodListening={goodListening} startGoodListening={startGoodListening}
+    badListening={badListening} startBadListening={startBadListening}
+    userList={userList}
+    send={send} sending={sending}
+
+    // 👇ここ追加🔥
+    freeNote={freeNote}
+    setFreeNote={setFreeNote}
+    freeNoteListening={freeNoteListening}
+    setFreeNoteListening={setFreeNoteListening}
+  />
+)}
 
       {/* === LOG === */}
       {view === "LOG" && (
