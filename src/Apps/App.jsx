@@ -702,7 +702,7 @@ const logPayload = {
 
       {/* === INTRO === */}
       {view === "INTRO" && (
-        <IntroScreen stage={stage} setView={setView} setGateOpen={setGateOpen} setStep={setStep} />
+        <IntroScreen stage={stage} setView={setView} setGateOpen={setGateOpen} setStep={setStep} teamName={teamName} />
       )}
 
       {/* === ヘッダー（INTRO以外） === */}
