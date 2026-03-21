@@ -37,6 +37,7 @@ export default function IntroScreen({ stage, setView, setGateOpen }) {
                         className="btnSecondary"
                         onClick={() => {
                             setView("FRONT");
+                            setStep(teamName ? "roster" : "join");
                             setGateOpen(true);
                         }}
                     >
