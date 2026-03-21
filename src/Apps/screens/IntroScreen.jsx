@@ -8,8 +8,9 @@ import kobusiImg from "../../Images/kobusi.png";
  * @param {string} props.stage - アニメーション段階 ("intro"|"moveUp"|"done")
  * @param {function} props.setView - 画面切り替え
  * @param {function} props.setGateOpen - 設定モーダル開閉
+ * @param {function} props.setStep - ステップ切り替え
  */
-export default function IntroScreen({ stage, setView, setGateOpen }) {
+export default function IntroScreen({ stage, setView, setGateOpen, setStep }) {
     return (
         <div className={`introWrap ${stage}`}>
             {stage === "done" && <BrainShower />}
