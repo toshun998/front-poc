@@ -138,6 +138,7 @@ export const sanitizeAdvice = (t) =>
 
 /** OUTLIER表示順序（index.tsのORDERと同期） */
 export const OUTLIER_ORDER = [
+    "短絡",  // ← 追加
     "速断",
     "循環",
     "二択",
@@ -173,6 +174,17 @@ export const sortOutlierFlags = (flags) => {
 };
 
 export const OUTLIER = {
+    "短絡": {
+    icon: "⛓️",
+    code: "短絡",
+    label: "短絡",
+    color: "#f59e0b",
+    desc: [
+        "それだけが理由？",
+        "他にも原因、ない？",
+        "本当にそれのせい？"
+    ],
+},
     "速断": {
         icon: "⚡",
         code: "速断",
