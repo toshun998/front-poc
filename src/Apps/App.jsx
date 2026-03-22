@@ -236,9 +236,9 @@ const currentCompanyCode = localStorage.getItem("companyCode") || "";
     teamName, currentUserId, gateOpen, step, userList,
     setUserList, setStep, setTeamName,
     topic, selectedTarget, scenario, scenarioFixed,
-    premise, trouble, otherPrem, cause, idea, plans,
+    premise, trouble, otherPrem, cause, idea, plans, freeNote,
     setTopic, setSelectedTarget, setScenario, setPremise,
-    setTrouble, setOtherPrem, setCause, setIdea, setPlans,
+    setTrouble, setOtherPrem, setCause, setIdea, setPlans,setFreeNote,
     setCurrentUserId, setCurrentUserName, setNotes,
   });
 
