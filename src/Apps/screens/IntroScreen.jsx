@@ -18,7 +18,7 @@ export default function IntroScreen({ stage, setView, setGateOpen, setStep, team
             {stage === "done" && <BrainShower />}
 
             <div className="introRow">
-                <img src={light1Img} alt="ひらめき" className="punchAnim" />
+                    <img src={light2Img} alt="ひらめき" className="punchAnim" />
                 <h1 className="introTitle">知性の壁をぶち破れ！</h1>
             </div>
 
