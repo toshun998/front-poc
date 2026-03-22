@@ -1,7 +1,8 @@
 // ========== INTRO画面 ==========
 import { BrainShower } from "./BrainShower";
 import kobusiImg from "../../Images/kobusi.png";
-
+import light1Img from "../../Images/light1.png";
+import light2Img from "../../Images/light2.png";
 /**
  * イントロ / ホーム画面
  * @param {object} props
@@ -17,7 +18,7 @@ export default function IntroScreen({ stage, setView, setGateOpen, setStep, team
             {stage === "done" && <BrainShower />}
 
             <div className="introRow">
-                <img src={kobusiImg} alt="拳" className="punchAnim" />
+                <img src={light1Img} alt="ひらめき" className="punchAnim" />
                 <h1 className="introTitle">知性の壁をぶち破れ！</h1>
             </div>
 
