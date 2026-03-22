@@ -141,7 +141,7 @@ export function useRosterSync({
             } catch (err) {
                 console.error("ポーリングエラー:", err);
             }
-        }, 5000);
+        }, 30000);
 
         return () => clearInterval(intervalId);
     }, [gateOpen, step, teamName, userList]);
@@ -271,7 +271,7 @@ export function useRosterSync({
             } catch (err) {
                 console.error("進行状況同期エラー:", err);
             }
-        }, 5000);
+        }, 30000);
 
         return () => clearInterval(intervalId);
     }, [teamName, currentUserId]);
