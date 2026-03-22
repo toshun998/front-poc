@@ -12,6 +12,8 @@ import {
 export function useRosterSync({
     teamName,
     freeNote,
+     setScenarioFixed,
+     restoredRef,
     setFreeNote,
     currentUserId,
     gateOpen,
@@ -76,7 +78,9 @@ export function useRosterSync({
             setCause(my.cause || "");
             setIdea(my.idea || "");
             setFreeNote(my.freeNote || ""); // ← 追加
-            setPlans(Array.isArray(my.plans) ? my.plans : []);
+            setScenarioFixed(my.scenarioFixed ?? false); // ← 追加
+setPlans(Array.isArray(my.plans) ? my.plans : []);
+restoredRef.current = true; // ← ここに追加
         })();
     }, []);
 
@@ -105,8 +109,30 @@ export function useRosterSync({
                         }))
                     );
 
-                    if (savedUserId && savedUserName) {
-                        setStep("front");
+if (savedUserId && savedUserName) {
+    try {
+        const res = await getTeamUserStates(savedTeam);
+        const my = res.users?.find((u) => u.userId === savedUserId);
+        if (my) {
+                restoredRef.current = true; // ← 最初に設定
+            setTopic(my.topic || "");
+            setSelectedTarget(my.target || "");
+            setScenario(my.scenario || "");
+            setPremise(my.premise || "");
+            setTrouble(my.trouble || "");
+            setOtherPrem(my.otherPrem || "");
+            setCause(my.cause || "");
+            setIdea(my.idea || "");
+            setFreeNote(my.freeNote || "");
+            setScenarioFixed(my.scenarioFixed ?? false); // ← 追加
+setPlans(Array.isArray(my.plans) ? my.plans : []);
+
+console.log("✅ 復元完了 restoredRef=", restoredRef.current, "target=", my.target);
+        }
+    } catch (err) {
+        console.error("フォーム復元エラー:", err);
+    }
+    setStep("front");
                     } else {
                         setStep("roster");
                     }
@@ -156,7 +182,8 @@ export function useRosterSync({
         const currentProgress = {
             topic,
             target: selectedTarget,
-            scenario: scenarioFixed ? scenario : null,
+scenario: scenario, // ← 常に保存
+    scenarioFixed, // ← 追加
             premise,
             trouble,
             otherPrem,

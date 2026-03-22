@@ -74,6 +74,7 @@ export default function App() {
   const [stage, setStage] = useState("intro");
 
   // ── 入力フォーム ──
+  const restoredRef = useRef(false);
   const [topic, setTopic] = useState("");
   const [teamName, setTeamName] = useState(() => localStorage.getItem("teamName") || "");
   const [page, setPage] = useState(1);
@@ -236,9 +237,9 @@ const currentCompanyCode = localStorage.getItem("companyCode") || "";
     teamName, currentUserId, gateOpen, step, userList,
     setUserList, setStep, setTeamName,
     topic, selectedTarget, scenario, scenarioFixed,
-    premise, trouble, otherPrem, cause, idea, plans, freeNote,
+    premise, trouble, otherPrem, cause, idea, plans, freeNote,  restoredRef,
     setTopic, setSelectedTarget, setScenario, setPremise,
-    setTrouble, setOtherPrem, setCause, setIdea, setPlans,setFreeNote,
+    setTrouble, setOtherPrem, setCause, setIdea, setPlans,setFreeNote, setScenarioFixed,
     setCurrentUserId, setCurrentUserName, setNotes,
   });
 
@@ -333,8 +334,8 @@ const currentCompanyCode = localStorage.getItem("companyCode") || "";
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // ── 当事者AI選定 ──
-  useEffect(() => {
+// ── 当事者AI選定 ──
+useEffect(() => {
     (async () => {
       try {
         const res = unbox(await getTargets?.(topic));
@@ -344,16 +345,28 @@ const currentCompanyCode = localStorage.getItem("companyCode") || "";
         ];
         setTargetList(normalizeStakeholders(topic, ai));
       } catch { setTargetList(normalizeStakeholders(topic, [])); }
+
+      if (!restoredRef.current) {
+        console.log("⛔ リセットスキップ restoredRef=false");
+        return;
+      }
+      // ← ここを追加：復元直後（selectedTargetがある）はリセットしない
+      if (selectedTarget) {
+        console.log("⛔ リセットスキップ selectedTargetあり");
+        return;
+      }
+      console.log("🔄 リセット実行 restoredRef=true");
       setSelectedTarget(""); setScenario(""); setScenarioDraft(""); setScenarioFixed(false);
     })();
-  }, [topic]);
+}, [topic]);
 
-  // ── シナリオ生成 ──
-  useEffect(() => {
+// ── シナリオ生成 ──
+useEffect(() => {
     if (!selectedTarget) return;
+    if (!restoredRef.current) return; // 復元前はリセットしない
     const s = `${toTaigen(topic)}について考えよう。\nその件で、${selectedTarget}が困っていることがあります。\n困っている${selectedTarget}を助けよう。`;
     setScenario(s); setScenarioDraft(s); setScenarioFixed(false);
-  }, [selectedTarget]);
+}, [selectedTarget]);
 
   // ── Board初回中央表示 ──
   useEffect(() => {
@@ -748,6 +761,7 @@ const logPayload = {
 
       {/* === LOGを見るモーダル === */}
       <LogViewerModal
+          isFacilitator={!!localStorage.getItem("facilitatorKey")} // ← 追加
         logOpen={logOpen} setLogOpen={setLogOpen}
         teamName={teamName}
         selectedLog={selectedLog} setSelectedLog={setSelectedLog}

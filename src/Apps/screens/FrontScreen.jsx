@@ -427,9 +427,15 @@ const resetPage2 = () => {
         Page1リセット
     </button>
 
-    <button className="btnDark" onClick={() => setPage(2)}>
-        次へ
-    </button>
+<button className="btnDark" onClick={() => {
+    if (!scenarioFixed) {
+        alert("シナリオを決定してください。");
+        return;
+    }
+    setPage(2);
+}}>
+    次へ
+</button>
 </div>
                     </>
                 )}

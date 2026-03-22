@@ -5,6 +5,7 @@ import { RenderFlags } from "../components/OutlierBadges";
  * LOGを見るモーダル
  */
 export default function LogViewerModal({
+        isFacilitator, // ← 追加
     logOpen,
     setLogOpen,
     teamName,
@@ -107,31 +108,29 @@ export default function LogViewerModal({
                                 </span>
                             </button>
 
-                            {/* 📥 全員分DL */}
-                            <button
-                                className="btn"
-                                style={{
-                                    background: "#2563eb",
-                                    color: "#fff",
-                                    whiteSpace: "nowrap",
-                                    padding: "8px 12px",
-                                }}
-                                onClick={() => {
-                                    if (!userList || userList.length === 0) {
-                                        alert("参加者がいません。");
-                                        return;
-                                    }
-
-                                    const allLogs = buildAllLogsForDownload(
-                                        userList,
-                                        userLogs
-                                    );
-                                    setLogsForDownload(allLogs);
-                                    setDlSelectOpen(true);
-                                }}
-                            >
-                                全員分DL
-                            </button>
+{/* 📥 全員分DL - ファシリテーターのみ */}
+{isFacilitator && (
+    <button
+        className="btn"
+        style={{
+            background: "#2563eb",
+            color: "#fff",
+            whiteSpace: "nowrap",
+            padding: "8px 12px",
+        }}
+        onClick={() => {
+            if (!userList || userList.length === 0) {
+                alert("参加者がいません。");
+                return;
+            }
+            const allLogs = buildAllLogsForDownload(userList, userLogs);
+            setLogsForDownload(allLogs);
+            setDlSelectOpen(true);
+        }}
+    >
+        全員分DL
+    </button>
+)}
 
                             {/* 🗑 チーム記録を削除 */}
                             <button
