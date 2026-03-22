@@ -11,6 +11,8 @@ import {
  */
 export function useRosterSync({
     teamName,
+    freeNote,
+    setFreeNote,
     currentUserId,
     gateOpen,
     step,
@@ -73,6 +75,7 @@ export function useRosterSync({
             setOtherPrem(my.otherPrem || "");
             setCause(my.cause || "");
             setIdea(my.idea || "");
+            setFreeNote(my.freeNote || ""); // ← 追加
             setPlans(Array.isArray(my.plans) ? my.plans : []);
         })();
     }, []);
@@ -159,6 +162,7 @@ export function useRosterSync({
             otherPrem,
             cause,
             idea,
+            freeNote,
             plans,
         };
 
@@ -203,6 +207,7 @@ export function useRosterSync({
         otherPrem,
         cause,
         idea,
+        freeNote,
         plans,
     ]);
 
