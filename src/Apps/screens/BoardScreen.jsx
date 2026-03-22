@@ -152,11 +152,17 @@ export default function BoardScreen({
                     <span className="hint" style={{ marginLeft: 6 }}>
                         指標：
                     </span>
-                    <select
-                        value={matrixSpec}
-                        onChange={(e) => setMatrixSpec(e.target.value)}
-                        style={{ marginRight: 12, padding: "4px 8px" }}
-                    >
+<select
+    value={matrixSpec}
+    onChange={(e) => setMatrixSpec(e.target.value)}
+    style={{
+        marginRight: 12,
+        padding: "4px 8px",
+        border: "1px solid #d1d5db", // ← 追加
+        borderRadius: 6,             // ← 追加
+        background: "#fff",          // ← 追加
+    }}
+>
                         <option value="impact-feasibility">効果 × 実現可能性</option>
                         <option value="importance-urgency">重要度 × 緊急度</option>
                         <option value="individual-collective">客観的 × 主観的</option>
@@ -216,10 +222,20 @@ export default function BoardScreen({
                     )}
 
                     {/* 各ノート描画 */}
-                    {Array.isArray(visibleNotes) &&
-                        flattenToBoardItems(visibleNotes).map((it) => {
-                            const key = it.key;
-                            const pos = matrixPos[key];
+{Array.isArray(visibleNotes) &&
+    flattenToBoardItems(visibleNotes).map((it) => {
+        const key = it.key;
+        // ← 追加：posがなければデフォルト位置をセット
+        if (!matrixPos[key]) {
+            setTimeout(() => {
+                setMatrixPos((p) => ({
+                    ...p,
+                    [key]: { xP: 45 + Math.random() * 10, yP: 45 + Math.random() * 10 },
+                }));
+            }, 0);
+            return null;
+        }
+        const pos = matrixPos[key];
                             if (!pos) return null;
 
                             const lines = it.lines || [];

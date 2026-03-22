@@ -541,7 +541,7 @@ const note = {
   }
 
   // ── 議論終結(バッジ評価) ──
-  const currentUser = userList?.[0] || "—";
+const currentUser = currentUserName || "—";
   async function runExplainLineEval() {
     setLoadingEval(true);
     const cvs = cvsRef.current, ctx = cvs.getContext("2d"), W = cvs.width = 920, H = cvs.height = 520;
