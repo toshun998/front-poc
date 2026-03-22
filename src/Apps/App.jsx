@@ -391,7 +391,7 @@ async function send() {
       const s1 = jaccard(h[h.length - 1], h[h.length - 2]);
       const s2 = jaccard(h[h.length - 2], h[h.length - 3]);
       if (s1 > 0.75 && s2 > 0.75) {
-        alert("これは外れ値だが：同じ調子が続いています。視点を1つ足して条件を変えてみよう。");
+        alert("同じ調子が続いています。条件を変えてみよう。");
       }
     }
 
