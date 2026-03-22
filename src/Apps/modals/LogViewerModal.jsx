@@ -211,7 +211,7 @@ export default function LogViewerModal({
                             <div className="hint">
                                 このユーザーのログはまだ作成されていません
                             </div>
-                        ) : (
+) : (
                             <>
                                 <div className="hint" style={{ marginBottom: 6 }}>
                                     最終更新：
@@ -308,6 +308,11 @@ export default function LogViewerModal({
                                             teamStats={{ H: 0, E: 0 }}
                                         />
                                     )}
+                                </div>
+                                <div>
+                                    <b>自由記述</b>
+                                    <br />
+                                    {selectedLog.freeNote || "—"}
                                 </div>
 
                                 <hr />
