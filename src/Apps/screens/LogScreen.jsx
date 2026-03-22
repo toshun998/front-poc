@@ -1,7 +1,7 @@
 // ========== LOG画面 ==========
-import { toText } from "../utils/helpers";
-import { RenderFlags } from "../components/OutlierBadges";
 
+import { RenderFlags } from "../components/OutlierBadges";
+import { toText, OUTLIER } from "../utils/helpers";
 /**
  * LOG画面 - ノート一覧表示
  */
@@ -11,6 +11,7 @@ export default function LogScreen({
     teamStats,
     openNoise,
 }) {
+    
     return (
         <main
             className="container"
@@ -106,7 +107,12 @@ export default function LogScreen({
                                         </div>
 
                                         <div style={{ marginTop: 4 }}>
-
+{(() => { 
+  const label = n.flagsDetail?.[key]?.[0];
+  const layer1 = label ? OUTLIER[label]?.desc : null;
+  console.log(`🎯 [${key}] ラベル:「${label}」 第1層:「${JSON.stringify(layer1)}」 第2層:「${n.results?.[key]?.advice}」`); 
+  return null; 
+})()}
 <RenderFlags
   flagsForField={n.flagsDetail?.[key]}
   rawText={toText(value)}
