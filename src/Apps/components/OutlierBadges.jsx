@@ -8,13 +8,11 @@ import { filterOutlierFlags } from "../utils/outlierLogic";
  * @param {string[]} props.flags - フラグ文字列の配列
  */
 
-function BadgeItem({ f }) {
+function BadgeItem({ f, adviceIndex = 0 }) {
     const m = OUTLIER[f] || { icon: "🙂", code: "", color: "#94a3b8", desc: String(f) };
-    const descText = useMemo(() =>
-        Array.isArray(m.desc)
-            ? m.desc[Math.floor(Math.random() * m.desc.length)]
-            : m.desc
-    , [f]);
+    const descText = Array.isArray(m.desc)
+        ? m.desc[adviceIndex] ?? m.desc[0]
+        : m.desc;
 
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -30,14 +28,14 @@ function BadgeItem({ f }) {
         </div>
     );
 }
-export function OutlierBadges({ flags = [] }) {
+export function OutlierBadges({ flags = [], adviceIndex = 0 }) {
     if (!Array.isArray(flags) || flags.length === 0) return null;
     // ソート済みのフラグを表示
     const sortedFlags = sortOutlierFlags(flags);
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
 {sortedFlags.map((f, i) => (
-    <BadgeItem key={`${f}-${i}`} f={f} />
+    <BadgeItem key={`${f}-${i}`} f={f} adviceIndex={adviceIndex} />
 ))}
         </div>
     );
@@ -50,9 +48,10 @@ export function OutlierBadges({ flags = [] }) {
  * @param {string} props.rawText - 元テキスト
  * @param {string} props.field - フィールド名
  * @param {string} props.advice - アドバイステキスト
+ * @param {number} props.adviceIndex - 第1層・第2層の対応インデックス
  * @param {object} props.teamStats - チーム統計 {H, E}
  */
-export function RenderFlags({ flagsForField, rawText, field, advice, teamStats }) {
+export function RenderFlags({ flagsForField, rawText, field, advice, adviceIndex = 0, teamStats }) {
     if (!rawText || rawText.trim().length === 0) return null;
 
     // ★ 追加：必ず配列にする
@@ -69,7 +68,7 @@ export function RenderFlags({ flagsForField, rawText, field, advice, teamStats }
     return (
         <div style={{ marginTop: 4 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <OutlierBadges flags={filtered} />
+                <OutlierBadges flags={filtered} adviceIndex={adviceIndex} />
 
                 {advice && (
                     <button

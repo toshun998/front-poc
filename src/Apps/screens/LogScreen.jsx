@@ -118,6 +118,7 @@ export default function LogScreen({
   rawText={toText(value)}
   field={key}
   advice={toText(n.results?.[key]?.advice)}
+  adviceIndex={n.results?.[key]?.adviceIndex ?? 0}  // ← 追加
   teamStats={teamStats}
 />
                                    
