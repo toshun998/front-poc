@@ -29,7 +29,7 @@ export default function IntroScreen({ stage, setView, setGateOpen, setStep, team
         marginRight: 12,
     }}
 />
-                <h1 className="introTitle">知性の壁をぶち破れ！</h1>
+                <h1 className="introTitle">知性を灯せ！</h1>
             </div>
 
             <div className="homeContent">
