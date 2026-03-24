@@ -359,11 +359,11 @@ export default function SettingsModal({
                             />
 
                             <span>
-                                <a href="/terms" target="_blank" rel="noopener noreferrer">
+                                <a href="https://shiko-athletic.studio.site/terms" target="_blank" rel="noopener noreferrer">
                                     利用規約
                                 </a>
                                 と
-                                <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                                <a href="https://shiko-athletic.studio.site/privacy" target="_blank" rel="noopener noreferrer">
                                     プライバシーポリシー
                                 </a>
                                 に同意します
