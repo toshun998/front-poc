@@ -476,7 +476,7 @@ button {
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInButtons 1s ease forwards;
-  animation-delay: 3s;
+  animation-delay: 2s;
 }
 
 /*LOGを見る更新エモート*/

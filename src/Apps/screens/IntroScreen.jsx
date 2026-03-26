@@ -27,7 +27,7 @@ export default function IntroScreen({ stage, setView, setGateOpen, setStep, team
                     思考アスレチック<span className="tm">®</span>
                 </h1>
 
-                <div className="buttonGroup">
+<div className="buttonGroup">
                     <button className="btnPrimary" onClick={() => setView("FRONT")}>
                         スタート
                     </button>
@@ -42,6 +42,21 @@ export default function IntroScreen({ stage, setView, setGateOpen, setStep, team
                         設定から始める
                     </button>
                 </div>
+
+<p style={{
+    fontSize: "12px",
+    color: "#94a3b8",
+    marginTop: 16,
+    textAlign: "center",
+    lineHeight: 1.6,
+    opacity: 0,
+    transform: "translateY(20px)",
+    animation: "fadeInButtons 1s ease forwards",
+    animationDelay: "3s",
+}}>
+    本サービスはOpenAI APIを利用しています。<br />
+    OpenAIによる提供・提携・推薦を受けたものではありません。
+</p>
             </div>
         </div>
     );
