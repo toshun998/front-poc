@@ -44,7 +44,7 @@ export default function IntroScreen({ stage, setView, setGateOpen, setStep, team
                 </div>
 
 <p style={{
-    fontSize: "12px",
+    fontSize: "10px",
     color: "#94a3b8",
     marginTop: 16,
     textAlign: "center",
