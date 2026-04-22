@@ -96,36 +96,34 @@ export default function SettingsModal({
                                 <button
                                     className="btn"
                                     onClick={async () => {
-                                        if (!teamName.trim()) {
-                                            alert("チーム名を入力してください");
-                                            return;
-                                        }
+    if (!teamName.trim()) {
+        alert("チーム名を入力してください");
+        return;
+    }
 
-                                        try {
-                                            const savedMembers = await getTeamMembers(savedTeam);
+    try {
+        const savedMembers = await getTeamMembers(teamName);
 
-                                            if (Array.isArray(savedMembers) && savedMembers.length > 0) {
-                                                setTeamName(savedTeam);
-                                                setConfirmedMembers(savedMembers);
-                                                setUserList(
-                                                savedMembers.map((name) => ({
-                                                    userId: name,
-                                                    name,
-                                                    removed: false,
-                                                }))
-                                            );
-                                                setStep(savedUserId && savedUserName ? "front" : "roster");
-                                            } else {
-                                                setUserList([{ name: "", removed: false }]);
-                                            }
-                                        } catch (err) {
-                                            console.error("KV名簿取得エラー:", err);
-                                            setUserList([{ name: "", removed: false }]);
-                                        }
+        if (Array.isArray(savedMembers) && savedMembers.length > 0) {
+            setConfirmedMembers(savedMembers);
+            setUserList(
+                savedMembers.map((name) => ({
+                    userId: name,
+                    name,
+                    removed: false,
+                }))
+            );
+        } else {
+            setUserList([{ name: "", removed: false }]);
+        }
+    } catch (err) {
+        console.error("KV名簿取得エラー:", err);
+        setUserList([{ name: "", removed: false }]);
+    }
 
-                                        localStorage.setItem("teamName", teamName);
-                                        setStep("roster");
-                                    }}
+    localStorage.setItem("teamName", teamName);
+    setStep("roster");
+}}
                                 >
                                     チームに入る
                                 </button>
